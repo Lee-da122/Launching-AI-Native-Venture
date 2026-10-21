@@ -1,0 +1,37 @@
+
+{% extends "base.html" %}
+{% block title %}Competitions · TeamMatch{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <div class="eyebrow">{{ "Join a Team" if mode == "join" else "Recruit a Team" }}</div>
+    <h1>Choose a competition</h1>
+    <p class="muted">Search the demo competition list and continue with one event.</p>
+  </div>
+
+  <form class="search" method="get">
+    <input type="hidden" name="mode" value="{{ mode }}">
+    <input name="q" value="{{ q }}" placeholder="Search competitions...">
+    <button type="submit">Search</button>
+  </form>
+</section>
+
+<div class="competition-grid">
+  {% for competition in competitions %}
+    <article class="card competition-card">
+      <div class="muted small">{{ competition.organizer }}</div>
+      <h2>{{ competition.name }}</h2>
+      <p>{{ competition.description }}</p>
+      <div class="deadline">Deadline: {{ competition.deadline }}</div>
+
+      {% if mode == "join" %}
+        <a class="primary-link" href="{{ url_for('competition_teams', competition_id=competition.id) }}">Find teams</a>
+      {% else %}
+        <a class="primary-link" href="{{ url_for('recruit', competition_id=competition.id) }}">Recruit for this competition</a>
+      {% endif %}
+    </article>
+  {% else %}
+    <p>No competitions found.</p>
+  {% endfor %}
+</div>
+{% endblock %}

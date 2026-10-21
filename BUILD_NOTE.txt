@@ -1,0 +1,3 @@
+Code syntax passed. Runtime smoke test was skipped or failed in the build environment.
+Reason: ModuleNotFoundError: No module named 'flask'
+Run `py -m pip install -r requirements.txt` before starting the app.
