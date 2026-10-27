@@ -1,0 +1,74 @@
+
+{% extends "base.html" %}
+{% block title %}Home · TeamMatch{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <div class="eyebrow light">Team formation before coordination problems begin</div>
+    <h1>What do you want to do?</h1>
+    <p>Use your saved profile to join a compatible team, or recruit people who fit what your team needs.</p>
+  </div>
+</section>
+
+<section class="choice-grid">
+  <a class="choice-card" href="{{ url_for('competitions', mode='join') }}">
+    <div class="choice-icon">→</div>
+    <h2>Join a Team</h2>
+    <p>Search a competition, compare recruiting teams, see compatibility reasons, shortlist, and apply.</p>
+  </a>
+  <a class="choice-card" href="{{ url_for('competitions', mode='recruit') }}">
+    <div class="choice-icon">+</div>
+    <h2>Recruit a Team</h2>
+    <p>Choose a competition, create a recruiting post, and review applicants with compatibility explanations.</p>
+  </a>
+</section>
+
+<section class="card feedback-pref-card">
+  <div>
+    <h2>Recommendation feedback</h2>
+    <p class="muted">Your feedback may be used to improve future teammate recommendations. This changes matching-factor weights only; it never creates a permanent score for a person.</p>
+  </div>
+  <form method="post" action="{{ url_for('feedback_preference') }}">
+    <label class="toggle-row">
+      <input type="checkbox" name="feedback_opt_in" {% if logged_in_user.feedback_opt_in %}checked{% endif %}>
+      Use my recommendation feedback to improve TeamMatch
+    </label>
+    <button class="secondary" type="submit">Save preference</button>
+  </form>
+</section>
+
+<div class="dashboard-grid">
+  <section class="card">
+    <h2>My recruiting posts</h2>
+    {% if my_teams %}
+      {% for team in my_teams %}
+        <div class="row-item">
+          <div>
+            <strong>{{ team.title }}</strong>
+            <div class="muted small">{{ team.competition_name }}</div>
+          </div>
+          <a class="text-link" href="{{ url_for('team_applicants', team_id=team.id) }}">View applicants</a>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted">No recruiting posts yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>My applications</h2>
+    {% if applications %}
+      {% for application in applications %}
+        <div class="row-item">
+          <div>
+            <strong>{{ application.team_title }}</strong>
+            <div class="muted small">Status: {{ application.status }}</div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted">No applications yet.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

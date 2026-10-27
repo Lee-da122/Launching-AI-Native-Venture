@@ -1,0 +1,18 @@
+Session 7 refactor
+
+Architecture changed from one large app.py to:
+- app.py: routes / UX flow
+- db.py: SQLite and migrations
+- matching.py: compatibility scoring / active weights
+- learning.py: feedback statistics / proposals / human review
+
+Initial weights preserve the original MVP: skills 35%, availability 20%, preferred role 20%, working style 10%, project goal 15%.
+
+Learning proposal threshold: at least 5 learning-eligible rejections with the same mapped reason.
+No proposal is auto-applied. Only founder/admin Approve changes active weights.
+
+Run:
+py -m pip install -r requirements.txt
+py app.py
+
+Then open http://127.0.0.1:5000

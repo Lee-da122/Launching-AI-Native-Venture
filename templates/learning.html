@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Learning review · TeamMatch{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <div class="eyebrow">Founder / admin review</div>
+    <h1>Recommendation learning loop</h1>
+    <p class="muted">Feedback can suggest a change. No matching weight changes until a human approves it.</p>
+  </div>
+</section>
+
+<div class="metric-grid">
+  <section class="metric"><span>Total feedback</span><strong>{{ summary.total }}</strong></section>
+  <section class="metric"><span>Accepts</span><strong>{{ summary.accepts }}</strong></section>
+  <section class="metric"><span>Rejects</span><strong>{{ summary.rejects }}</strong></section>
+  <section class="metric"><span>Acceptance rate</span><strong>{{ summary.acceptance_rate }}%</strong></section>
+  <section class="metric"><span>Mismatch rejection rate</span><strong>{{ summary.mismatch_rejection_rate }}%</strong></section>
+</div>
+
+<section class="card">
+  <div class="section-head"><div><h2>Active matching weights</h2><p class="muted small">Total: {{ ((active_weights.values()|sum) * 100)|round(1) }}%</p></div></div>
+  <div class="weight-grid">
+    {% for key, value in active_weights.items() %}<div><span>{{ key.replace('_',' ')|title }}</span><strong>{{ (value*100)|round(1) }}%</strong></div>{% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <h2>Rejection reasons</h2>
+  <p class="muted">Only feedback from users who opted into learning is included here.</p>
+  {% for reason, count in summary.reason_counts.items() %}
+    <div class="row-item"><span>{{ reason }}</span><strong>{{ count }}</strong></div>
+  {% endfor %}
+</section>
+
+<section class="card">
+  <h2>Generate a proposed weight change</h2>
+  <p class="muted">Rule: a mapped rejection reason must appear at least 5 times. The most repeated factor is proposed at +5 percentage points; all other weights are reduced proportionally so the total stays 100%.</p>
+  <div class="button-row">
+    <form method="post" action="{{ url_for('learning_generate_proposal') }}"><button class="primary compact" type="submit">Generate proposal</button></form>
+    <form method="post" action="{{ url_for('learning_demo_feedback') }}"><button class="secondary" type="submit">Add labelled demo feedback</button></form>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Weight proposals</h2>
+  {% for p in proposals %}
+    <div class="proposal">
+      <div class="row-item"><strong>{{ p.row.main_reason }}</strong><span class="status-pill">{{ p.row.status }}</span></div>
+      <p>{{ p.row.reason }}</p>
+      <div class="comparison-grid">
+        <div><h3>Current</h3>{% for key,value in p.old.items() %}<div class="mini-row"><span>{{ key }}</span><span>{{ (value*100)|round(1) }}%</span></div>{% endfor %}<div class="mini-row total"><strong>Total</strong><strong>{{ ((p.old.values()|sum)*100)|round(1) }}%</strong></div></div>
+        <div><h3>Proposed</h3>{% for key,value in p.new.items() %}<div class="mini-row"><span>{{ key }}</span><span>{{ (value*100)|round(1) }}%</span></div>{% endfor %}<div class="mini-row total"><strong>Total</strong><strong>{{ ((p.new.values()|sum)*100)|round(1) }}%</strong></div></div>
+      </div>
+      <p class="muted small">Evidence: {{ p.row.feedback_count }} relevant feedback records.</p>
+      {% if p.row.status == 'Pending' %}
+      <div class="button-row">
+        <form method="post" action="{{ url_for('learning_review', proposal_id=p.row.id, action='approve') }}"><button class="primary compact" type="submit">Approve</button></form>
+        <form method="post" action="{{ url_for('learning_review', proposal_id=p.row.id, action='reject') }}"><button class="secondary" type="submit">Reject</button></form>
+      </div>
+      {% endif %}
+    </div>
+  {% else %}<p class="muted">No proposals yet.</p>{% endfor %}
+</section>
+
+<section class="card">
+  <h2>Approved weight history</h2>
+  {% for h in history %}
+    <div class="row-item"><div><strong>{{ h.row.created_at }}</strong><div class="muted small">{{ h.row.reason }}</div></div><span>{{ h.row.feedback_count }} feedback</span></div>
+  {% else %}<p class="muted">No approved changes yet.</p>{% endfor %}
+</section>
+{% endblock %}
