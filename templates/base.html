@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -12,9 +11,11 @@
     <a class="brand" href="{{ url_for('dashboard') if logged_in_user else url_for('login') }}">TeamMatch</a>
     <div class="nav-links">
       {% if logged_in_user %}
-        <span class="nav-user">{{ logged_in_user.name }}</span>
-        <a href="{{ url_for('dashboard') }}">Home</a>
-        {% if is_admin %}<a href="{{ url_for('learning_dashboard') }}">Learning review</a>{% endif %}
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('competitions', mode='join') }}">Join</a>
+        <a href="{{ url_for('competitions', mode='recruit') }}">Recruit</a>
+        <a href="{{ url_for('profile') }}">Profile</a>
+        {% if is_admin %}<a href="{{ url_for('learning_dashboard') }}">Learning</a>{% endif %}
         <a href="{{ url_for('logout') }}">Logout</a>
       {% endif %}
     </div>

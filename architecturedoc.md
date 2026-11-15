@@ -1,120 +1,101 @@
-# TeamMatch Architecture Document — Phase 3
+# TeamMatch Architecture — Demo Day Candidate
 
-## Production architecture
+## Production flow
 
 ```text
-K-Startup Open API ---------\
-                              -> sync_competitions.py (manual / daily Railway job)
-WEVITY university listings --/       -> normalize + filter
-                                      -> source upsert + conservative cross-source dedup
-                                      -> Railway PostgreSQL
+Competition sources
+  -> competition-sync-v2 (scheduled worker)
+  -> normalize / stable upsert
+  -> Railway PostgreSQL
 
 Browser
-  -> Flask / Gunicorn on Railway
-  -> Competition search/filter (PostgreSQL only)
-  -> Select competition
-  -> Join / Recruit
-  -> Existing matching + human decision
+  -> Railway HTTPS
+  -> Gunicorn / Flask / Jinja
+  -> SQLAlchemy Core
+  -> PostgreSQL
+  -> Competition
+  -> Join or Recruit
+  -> optional same-university FILTER
+  -> existing compatibility score
+  -> human decision
 ```
 
-The normal web request path never contacts K-Startup or WEVITY. External-source outages therefore do not take down the Competition page; users see the last known PostgreSQL data.
+## Matching boundary
 
-## Competition sources / provenance
-
-### K-Startup
-Official Open API `getAnnouncementInformation01`, provided through data.go.kr. It is the preferred provenance when an identical competition is found in both sources. It requires `K_STARTUP_SERVICE_KEY` for live calls.
-
-### WEVITY
-The supplementary source is the publicly accessible WEVITY university competition listing/detail pages. The collector stores only minimal metadata required for TeamMatch discovery: title, organizer, category, eligibility, application dates, source URL and WEVITY `ix` identifier. It does not copy detailed article text or poster images.
-
-The collector uses a descriptive User-Agent, timeout, one retry, sequential requests and a small page/detail cap. It does not use login, CAPTCHA solving, browser automation, anti-bot bypass or rate-limit circumvention. No explicit automated-access permission was established during review, so project documentation should not describe WEVITY as an officially licensed feed.
-
-The MVP intentionally collects a useful current subset and does not claim complete coverage of Korean competitions.
-
-## Competition schema
-
-The existing `competitions.id` primary key remains unchanged. Phase 3 fields are:
-
-- `category`
-- `eligibility`
-- `participation_type`
-- `source_name`
-- `source_url`
-- `external_id`
-- `fetched_at`
-- `updated_at`
-- `is_active`
-- `application_start_date`
-- `deadline_date`
-- `original_deadline_text`
-
-Legacy `name`, `organizer`, `deadline`, and `description` remain for compatibility. Existing team foreign keys are preserved.
-
-`source_name + external_id` has a unique index. K-Startup uses `pbanc_sn`; WEVITY uses the stable `ix` query parameter.
-
-## Normalization / safety
-
-- Korean titles are preserved for display.
-- K-Startup HTML fragments are converted to plain text.
-- WEVITY long-form detail content is not stored; a short safe fallback description is used.
-- Missing eligibility/participation data remains missing.
-- Unknown/invalid dates remain NULL; no date is invented.
-- D-day is calculated by TeamMatch at request time from `deadline_date`.
-- Source URLs are retained and displayed with safe external-link attributes.
-- Jinja auto-escaping remains enabled.
-
-## Deduplication / update behavior
-
-First identity:
+The compatibility engine remains independent of university filtering.
 
 ```text
-source_name + external_id
+Skills
+Availability
+Preferred role
+Working style
+Project goal
+   -> active human-approved weights
+   -> Session 8 fixed mismatch safeguards
+   -> clamp 0–100
 ```
 
-If there is no same-source identity match, TeamMatch performs a conservative cross-source fingerprint:
+The university filter runs before rendering the eligible team/applicant set. It does not pass university into `matching.compatibility()` and therefore cannot change a candidate's score.
+
+Join identity:
 
 ```text
-normalized exact title
-+ normalized organizer when both are present
-+ exact deadline_date
+current user university
+vs
+team owner's user.university
 ```
 
-No fuzzy similarity merge is used. This intentionally prefers occasional duplicates over incorrectly merging unrelated competitions.
+Recruit identity:
 
-When a cross-source duplicate is found, the existing TeamMatch row ID is reused. K-Startup provenance wins over WEVITY provenance because K-Startup is the official structured source.
+```text
+team owner university
+vs
+applicant user.university
+```
 
-The sync never implements `DELETE all competitions -> INSERT all`.
+Normalization trims whitespace, collapses repeated spaces and casefolds. There is no fuzzy matching or abbreviation inference.
 
-## Expiration
+## UI evidence hierarchy
 
-Known past deadlines are marked inactive, but rows are retained. Historical TeamMatch teams/applications continue to resolve the same competition ID. A listing merely disappearing from a source fetch is not automatically deleted or inactivated.
+Match cards display:
 
-## Failure behavior
+1. actual compatibility percentage;
+2. five scan-friendly labels derived from the real `factors` dictionary;
+3. existing evidence-based reasons from `matching.py`;
+4. actual team action (Apply / Shortlist);
+5. visually separate recommendation-learning feedback.
 
-- One source fails -> log source failure, continue other sources.
-- All sources fail -> non-zero exit, preserve all previous rows.
-- One malformed record -> count/log and continue.
-- No source failure causes table clearing or mass deletion.
+Critical mismatch reasons are shown in user-friendly text while the numerical penalty implementation remains internal.
 
-## HTTP behavior
+## Learning loop
 
-K-Startup:
-- descriptive User-Agent
-- 15-second timeout
-- limited retries
-- short page delay
-- five-page MVP cap
+```text
+Recommendation
+ -> Accept/Reject recommendation feedback
+ -> optional mapped reason/comment
+ -> feedback record
+ -> summary
+ -> proposal after threshold
+ -> admin review
+ -> approved active weights
+ -> future matching
+```
 
-WEVITY:
-- descriptive User-Agent
-- 15-second timeout
-- one retry
-- sequential requests only
-- 0.7-second delay
-- two listing pages / forty detail requests maximum per run
+Recommendation acceptance is preference feedback only and is not treated as successful teamwork.
 
-## Existing TeamMatch architecture preserved
+## Security and production configuration
 
-Account, Join, Recruit, shortlist, applications, applicant ownership checks, Session 8 matching penalties/guard, Session 7 learning loop, admin authorization, CSRF, secure sessions, PostgreSQL, Gunicorn and `/healthz` remain separate from competition synchronization.
+Preserved:
 
-Competition data never modifies matching weights, feedback, reputation, or applicant status.
+- production `SECRET_KEY` requirement
+- secure/HttpOnly/SameSite session cookie settings
+- CSRF validation on POST
+- backend admin authorization for `/learning` and review actions
+- `ENABLE_DEMO_FEEDBACK` production restriction
+- PostgreSQL through `DATABASE_URL`
+- Gunicorn
+- DB-aware `/healthz`
+
+## Competition sync
+
+The web request path reads only stored competition data. Collection remains in `sync_competitions.py` and source adapters. Upsert preserves existing `competitions.id` values and therefore team/application relationships. Source failures do not clear stored competition data.

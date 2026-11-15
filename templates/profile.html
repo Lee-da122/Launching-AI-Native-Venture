@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Profile · TeamMatch{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <div class="eyebrow">My Profile</div>
+    <h1>{{ user.name }}</h1>
+    <p class="muted">This profile is used for teammate compatibility. University is used only when you choose the same-university filter.</p>
+  </div>
+</section>
+
+<section class="card profile-card">
+  <div class="profile-grid">
+    <div><span>Name</span><strong>{{ user.name }}</strong></div>
+    <div><span>University</span><strong>{{ user.university }}</strong></div>
+    <div><span>Skills</span><strong>{{ user.skills }}</strong></div>
+    <div><span>Availability</span><strong>{{ user.availability }}</strong></div>
+    <div><span>Preferred role</span><strong>{{ user.preferred_role }}</strong></div>
+    <div><span>Working style</span><strong>{{ user.working_style }}</strong></div>
+    <div><span>Project goal</span><strong>{{ user.project_goal }}</strong></div>
+  </div>
+</section>
+{% endblock %}

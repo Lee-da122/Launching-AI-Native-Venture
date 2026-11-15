@@ -60,3 +60,17 @@ No Phase 3 crawler, same-university filter, UI redesign, AI recommendation featu
 - Controlled WEVITY parser fixture, cross-source dedup, source-isolation and all-source-failure tests pass.
 - Session 8 remains 10/10 normal + 5/5 attack; Phase 2 regression remains PASS.
 - Live Railway/WEVITY parsing is not claimed until this revision is pushed and run in production.
+
+## Phase 4 — Demo Day final product polish
+
+- Added same-university-only filtering on Join and Recruit without changing compatibility scores or weights.
+- Added conservative university normalization: trim, collapse whitespace, casefold only.
+- Added lightweight Profile page and clearer Dashboard/Join/Recruit/Profile navigation.
+- Improved dashboard hero and Competition -> Team action clarity.
+- Added real factor breakdown labels derived from matching factor values.
+- Separated Apply/Shortlist from recommendation-learning feedback in match cards.
+- Renamed recruiter decisions to Accept applicant / Reject applicant.
+- Added same-university empty states with Show all universities recovery.
+- Added responsive layout improvements for filters/cards/navigation.
+- Preserved Session 7 learning loop, Session 8 safeguards, CSRF/admin/security and Phase 3 sync architecture.
+- Controlled regressions: Phase4 22/22, Session8 10/10 + 5/5, Phase2 PASS, Phase3 PASS.

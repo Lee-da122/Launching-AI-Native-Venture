@@ -1,61 +1,53 @@
-# TeamMatch MVP Scope — Phase 3
+# TeamMatch MVP Scope — Demo Day Candidate
 
-## Current scope
+## In scope
 
 ### Account / profile
 - Sign up, login, logout
-- University/name/email profile
-- Hashed passwords
-- Skills, availability, preferred role, working style, project goal
-- Feedback-learning opt-out
+- Lightweight profile view
+- Name, university, skills, availability, preferred role, working style, project goal
+- Hashed passwords and feedback-learning preference
 
-### Competition discovery / team formation
-- South Korean competition-data collector using K-Startup Open API + limited WEVITY public-page metadata
-- PostgreSQL-backed competition search; no external source request during normal page rendering
-- Source provenance and original listing URL
-- Active/expired status and request-time D-day calculation
-- Category, status and closing-soon filters
-- Stable competition IDs through upsert rather than delete/reinsert
-- Conservative cross-source deduplication
-- Seed fixtures retained only for local/offline fallback
-- Join a Team / Recruit a Team modes preserved
-- Shortlist, apply, application status and recruiter applicant review preserved
+### Competition → team journey
+- Current Korean competition discovery from TeamMatch PostgreSQL
+- Keyword/category/status/deadline filters
+- Original source links and real last-fetched timestamp
+- Clear Join and Recruit actions
+- Stable competition IDs and external-source provenance
 
-### Matching / learning / safety
-- Explainable weighted compatibility
-- Human-approved active weights
-- Session 8 critical mismatch penalties and score clamp
-- Session 8 scope guard
-- Session 7 feedback learning loop and opt-out
-- Admin-only learning controls
-- No permanent teammate reputation or rejection penalty
+### Matching / team decisions
+- Existing five-factor compatibility model and active approved weights
+- Session 8 mismatch penalties and 0–100 clamp
+- Same-university-only filter on Join and Recruit
+- University displayed as context, not compatibility
+- Explainable factor breakdown derived from the real factor values
+- Shortlist / Apply to Team
+- Recruiter Accept applicant / Reject applicant
 
-### Deployment / persistence
+### Learning / safety
+- Recommendation feedback kept visually and semantically separate from applications
+- Session 7 rejection-reason learning loop and human approval
+- Session 8 search guardrail
+- No permanent teammate reputation
+
+### Production
 - Flask + Jinja + SQLAlchemy
-- Railway PostgreSQL via `DATABASE_URL`
-- Gunicorn + `/healthz`
-- Environment-based secret/admin settings
-- CSRF + secure production sessions
-- Phase 3 manual sync command: `python sync_competitions.py`
+- Railway PostgreSQL
+- Gunicorn, `/healthz`, CSRF, secure cookies, env-based secrets/admin authorization
+- Separate competition sync job; no crawler calls during page rendering
 
-## Production activation still requires
+## Out of scope after Phase 4
 
-- Push this Phase 3 revision to GitHub
-- Redeploy the Railway web service so the schema/code update is live
-- Run one successful manual sync against Railway PostgreSQL
-- Verify the WEVITY parser against the live pages from Railway
-- Configure a separate once-daily Railway cron service after manual sync succeeds
-- Optional: add `K_STARTUP_SERVICE_KEY` to broaden coverage with the official K-Startup source
-
-Until those are completed, the multi-source implementation is tested with controlled fixtures but live production competition ingestion is not yet verified.
-
-## Out of scope
-
-- Global competition collection
-- Same-university matching/filter
-- AI/LLM competition recommendations
-- New dashboard/match-card redesign
-- Chat / notifications / payments
+- Global competition scraping
+- Chat / messaging / real-time notifications
+- Calendar or payments
 - OAuth
-- Permanent good/bad teammate scoring
-- Phase 4 work
+- Personality testing
+- University as a matching weight
+- Fuzzy university inference such as `KU -> Korea University`
+- Permanent teammate reputation or blacklist
+- AI/LLM teammate scoring
+- Automatic matching-weight approval
+- Post-project surveillance/evaluation
+
+After Phase 4 the product is feature-frozen for Demo Day; only bugs, broken deployment, misleading text and serious UX issues should be fixed.

@@ -12,6 +12,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from db import get_db, init_db
 from guardrails import SCOPE_MESSAGE, is_out_of_scope_search
+from university import filter_applicants_same_university, filter_teams_same_university
 from learning import (
     REASONS,
     add_demo_feedback,
@@ -20,7 +21,7 @@ from learning import (
     review_proposal,
     save_feedback,
 )
-from matching import compatibility, get_active_weights
+from matching import compatibility, factor_breakdown, get_active_weights
 
 APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
 IS_PRODUCTION = APP_ENV == "production" or bool(os.getenv("RAILWAY_ENVIRONMENT"))
@@ -247,6 +248,12 @@ def dashboard():
     return render_template("dashboard.html", my_teams=my_teams, applications=applications)
 
 
+@app.route("/profile")
+@login_required
+def profile():
+    return render_template("profile.html", user=current_user())
+
+
 @app.post("/feedback-preference")
 @login_required
 def feedback_preference():
@@ -359,13 +366,17 @@ def competition_teams(competition_id):
         conn.close()
         abort(404)
 
+    same_university_only = request.args.get("same_university") == "1"
     teams = conn.execute(
-        """SELECT teams.*, users.name AS owner_name
+        """SELECT teams.*, users.name AS owner_name, users.university AS owner_university
            FROM teams JOIN users ON users.id = teams.owner_id
            WHERE teams.competition_id = :competition_id AND teams.owner_id != :user_id
            ORDER BY teams.created_at DESC""",
         {"competition_id": competition_id, "user_id": user["id"]},
     ).fetchall()
+    if same_university_only:
+        teams = filter_teams_same_university(user["university"], teams)
+
     weights = get_active_weights(conn)
     enriched = []
     for team in teams:
@@ -383,6 +394,7 @@ def competition_teams(competition_id):
             "score": score,
             "reasons": reasons,
             "factors": factors,
+            "factor_breakdown": factor_breakdown(factors),
             "application_status": applied["status"] if applied else None,
             "shortlisted": bool(shortlisted),
         })
@@ -391,6 +403,7 @@ def competition_teams(competition_id):
     return render_template(
         "teams.html", competition=competition, matches=enriched,
         feedback_reasons=REASONS, active_weights=weights,
+        same_university_only=same_university_only,
     )
 
 
@@ -423,7 +436,7 @@ def recommendation_feedback(team_id):
         user["id"], team_id, decision, reason, comment, score, factors, weights,
         bool(user["feedback_opt_in"]),
     )
-    flash("Feedback saved.")
+    flash("Recommendation feedback saved.")
     return redirect(request.referrer or url_for("dashboard"))
 
 
@@ -563,20 +576,30 @@ def team_applicants(team_id):
         conn.close()
         abort(403)
 
+    same_university_only = request.args.get("same_university") == "1"
     applicants = conn.execute(
         """SELECT applications.id AS application_id, applications.status, users.*
            FROM applications JOIN users ON users.id = applications.user_id
            WHERE applications.team_id = :team_id ORDER BY applications.created_at DESC""",
         {"team_id": team_id},
     ).fetchall()
+    if same_university_only:
+        applicants = filter_applicants_same_university(owner["university"], applicants)
+
     weights = get_active_weights(conn)
     enriched = []
     for applicant in applicants:
         score, reasons, factors = compatibility(applicant, team, weights)
-        enriched.append({"applicant": applicant, "score": score, "reasons": reasons, "factors": factors})
+        enriched.append({
+            "applicant": applicant,
+            "score": score,
+            "reasons": reasons,
+            "factors": factors,
+            "factor_breakdown": factor_breakdown(factors),
+        })
     enriched.sort(key=lambda x: x["score"], reverse=True)
     conn.close()
-    return render_template("applicants.html", team=team, applicants=enriched)
+    return render_template("applicants.html", team=team, applicants=enriched, same_university_only=same_university_only)
 
 
 @app.post("/application/<int:application_id>/<status>")

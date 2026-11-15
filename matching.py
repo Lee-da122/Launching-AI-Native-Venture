@@ -125,3 +125,15 @@ def compatibility(user, team, weights=None):
 
     final_score = max(0, min(100, base_score - penalty_total))
     return final_score, reasons, factors
+
+
+def factor_breakdown(factors):
+    """Turn the real factor values into scan-friendly labels without inventing scores."""
+    skills = float(factors.get("skills", 0) or 0)
+    return {
+        "skills": "Strong match" if skills >= 0.999 else ("Partial match" if skills > 0 else "No overlap"),
+        "availability": "Match" if factors.get("availability") else "Different",
+        "preferred_role": "Compatible" if factors.get("preferred_role") else "Different",
+        "working_style": "Match" if factors.get("working_style") else "Different",
+        "project_goal": "Match" if factors.get("project_goal") else "Different",
+    }

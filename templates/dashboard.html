@@ -1,12 +1,11 @@
-
 {% extends "base.html" %}
-{% block title %}Home · TeamMatch{% endblock %}
+{% block title %}Dashboard · TeamMatch{% endblock %}
 {% block content %}
 <section class="hero">
   <div>
-    <div class="eyebrow light">Team formation before coordination problems begin</div>
-    <h1>What do you want to do?</h1>
-    <p>Use your saved profile to join a compatible team, or recruit people who fit what your team needs.</p>
+    <div class="eyebrow light">Competition context + teammate compatibility</div>
+    <h1>Find the right competition.<br>Build the right team.</h1>
+    <p>Discover opportunities and find compatible university teammates based on skills, availability, preferred roles, working style, and project goals.</p>
   </div>
 </section>
 
@@ -14,19 +13,19 @@
   <a class="choice-card" href="{{ url_for('competitions', mode='join') }}">
     <div class="choice-icon">→</div>
     <h2>Join a Team</h2>
-    <p>Search a competition, compare recruiting teams, see compatibility reasons, shortlist, and apply.</p>
+    <p>Find a competition, compare recruiting teams by compatibility, shortlist, and apply.</p>
   </a>
   <a class="choice-card" href="{{ url_for('competitions', mode='recruit') }}">
     <div class="choice-icon">+</div>
     <h2>Recruit a Team</h2>
-    <p>Choose a competition, create a recruiting post, and review applicants with compatibility explanations.</p>
+    <p>Find a competition, post your team needs, and review compatible applicants.</p>
   </a>
 </section>
 
 <section class="card feedback-pref-card">
   <div>
     <h2>Recommendation feedback</h2>
-    <p class="muted">Your feedback may be used to improve future teammate recommendations. This changes matching-factor weights only; it never creates a permanent score for a person.</p>
+    <p class="muted">Tell TeamMatch whether a recommendation looked useful. This can improve future factor weights after human review; it does not mean the team was ultimately successful.</p>
   </div>
   <form method="post" action="{{ url_for('feedback_preference') }}">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
@@ -52,7 +51,7 @@
         </div>
       {% endfor %}
     {% else %}
-      <p class="muted">No recruiting posts yet.</p>
+      <p class="muted">No recruiting posts yet. Choose <strong>Recruit a Team</strong> to start from a competition.</p>
     {% endif %}
   </section>
 
@@ -68,7 +67,7 @@
         </div>
       {% endfor %}
     {% else %}
-      <p class="muted">No applications yet.</p>
+      <p class="muted">No applications yet. Choose <strong>Join a Team</strong> to browse competitions and teams.</p>
     {% endif %}
   </section>
 </div>

@@ -5,14 +5,21 @@
   <div>
     <div class="eyebrow">Join a Team</div>
     <h1>{{ competition.name }}</h1>
-    <p class="muted">Teams are sorted by compatibility with your saved profile.</p>
+    <p class="muted">Recruiting teams are ranked by compatibility with your saved profile. University filtering never changes the score.</p>
   </div>
   <a class="secondary-link" href="{{ url_for('competitions', mode='join') }}">Change competition</a>
 </section>
 
-<section class="notice-card">
-  <strong>Feedback & learning</strong>
-  <span>Your feedback may be used to improve future teammate recommendations. Accept here means you prefer the recommendation; it does not mean the team will necessarily work well.</span>
+<section class="filter-bar card compact-card">
+  <form method="get" class="inline-filter">
+    <label class="toggle-row compact-toggle">
+      <input type="checkbox" name="same_university" value="1" {% if same_university_only %}checked{% endif %} onchange="this.form.submit()">
+      Same university only
+    </label>
+    {% if same_university_only %}
+      <a class="text-link" href="{{ url_for('competition_teams', competition_id=competition.id) }}">Show all universities</a>
+    {% endif %}
+  </form>
 </section>
 
 {% if matches %}
@@ -21,11 +28,19 @@
       <article class="card match-card">
         <div class="match-top">
           <div>
-            <div class="muted small">Recruiter: {{ item.team.owner_name }}</div>
+            <div class="muted small">Recruiter: {{ item.team.owner_name }} · {{ item.team.owner_university }}</div>
             <h2>{{ item.team.title }}</h2>
-            <p>{{ item.team.description }}</p>
+            {% if item.team.description %}<p>{{ item.team.description }}</p>{% endif %}
           </div>
-          <div class="score">{{ item.score }}% fit</div>
+          <div class="score"><strong>{{ item.score }}%</strong><span>Match</span></div>
+        </div>
+
+        <div class="factor-grid" aria-label="Compatibility factor breakdown">
+          <div><span>Skills</span><strong>{{ item.factor_breakdown.skills }}</strong></div>
+          <div><span>Availability</span><strong>{{ item.factor_breakdown.availability }}</strong></div>
+          <div><span>Preferred role</span><strong>{{ item.factor_breakdown.preferred_role }}</strong></div>
+          <div><span>Working style</span><strong>{{ item.factor_breakdown.working_style }}</strong></div>
+          <div><span>Project goal</span><strong>{{ item.factor_breakdown.project_goal }}</strong></div>
         </div>
 
         <div class="tags">
@@ -36,14 +51,34 @@
         </div>
 
         <div class="reason-box">
-          <strong>Why this match</strong>
-          <ul>{% for reason in item.reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
+          <strong>Why this match?</strong>
+          <ul>
+            {% for reason in item.reasons %}
+              <li class="{% if reason.startswith('Critical mismatch:') %}critical-reason{% endif %}">{{ reason|replace('Critical mismatch: ', '') }}</li>
+            {% endfor %}
+          </ul>
         </div>
 
-        <div class="feedback-box">
+        <div class="team-actions">
+          {% if item.application_status %}
+            <button class="disabled" disabled>Applied · {{ item.application_status }}</button>
+          {% else %}
+            <form method="post" action="{{ url_for('apply_team', team_id=item.team.id) }}">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+              <button class="primary compact" type="submit">Apply to Team</button>
+            </form>
+          {% endif %}
+          <form method="post" action="{{ url_for('shortlist_team', team_id=item.team.id) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <button class="secondary" type="submit">{{ "Remove from Shortlist" if item.shortlisted else "Shortlist" }}</button>
+          </form>
+        </div>
+
+        <div class="feedback-box recommendation-feedback">
           <strong>Was this recommendation useful?</strong>
+          <p class="muted small">This is recommendation feedback, not an application decision or proof of successful teamwork.</p>
           <form method="post" action="{{ url_for('recommendation_feedback', team_id=item.team.id) }}">
-    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
             <div class="feedback-grid">
               <select name="reason" aria-label="Feedback reason">
                 <option value="">Optional reason</option>
@@ -51,32 +86,26 @@
               </select>
               <input name="comment" maxlength="180" placeholder="Optional short comment">
             </div>
-            <div class="button-row">
-              <button class="primary compact" type="submit" name="decision" value="Accept">Accept</button>
-              <button class="secondary" type="submit" name="decision" value="Reject">Reject</button>
-              <span class="muted small">A reason is especially useful after Reject.</span>
+            <div class="button-row feedback-actions">
+              <button class="feedback-button" type="submit" name="decision" value="Accept">Accept recommendation</button>
+              <button class="feedback-button" type="submit" name="decision" value="Reject">Reject recommendation</button>
             </div>
           </form>
-        </div>
-
-        <div class="button-row">
-          <form method="post" action="{{ url_for('shortlist_team', team_id=item.team.id) }}">
-    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-            <button class="secondary" type="submit">{{ "Remove shortlist" if item.shortlisted else "Shortlist" }}</button>
-          </form>
-          {% if item.application_status %}
-            <button class="disabled" disabled>Applied · {{ item.application_status }}</button>
-          {% else %}
-            <form method="post" action="{{ url_for('apply_team', team_id=item.team.id) }}">
-    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-              <button class="primary compact" type="submit">Apply to team</button>
-            </form>
-          {% endif %}
         </div>
       </article>
     {% endfor %}
   </div>
 {% else %}
-  <section class="card"><p class="muted">No recruiting teams are available for this competition yet.</p></section>
+  <section class="card empty-state">
+    {% if same_university_only %}
+      <h2>No same-university matches found</h2>
+      <p class="muted">There are no recruiting teams from your university for this competition right now.</p>
+      <a class="primary-link" href="{{ url_for('competition_teams', competition_id=competition.id) }}">Show all universities</a>
+    {% else %}
+      <h2>No recruiting teams are available for this competition yet.</h2>
+      <p class="muted">Try another competition, or switch to Recruit to create the first team post.</p>
+      <a class="secondary-link" href="{{ url_for('competitions', mode='join') }}">Browse competitions</a>
+    {% endif %}
+  </section>
 {% endif %}
 {% endblock %}

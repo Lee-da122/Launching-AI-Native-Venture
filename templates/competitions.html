@@ -5,8 +5,8 @@
   <div>
     <div class="eyebrow">{{ "Join a Team" if mode == "join" else "Recruit a Team" }}</div>
     <h1>Choose a competition</h1>
-    <p class="muted">Search current South Korean opportunities and continue with one competition.</p>
-    {% if last_updated %}<p class="muted small">Competition data last fetched: {{ last_updated.strftime('%Y-%m-%d') }}</p>{% endif %}
+    <p class="muted">Find a competition, then continue directly to compatible teams or create your own recruiting post.</p>
+    {% if last_updated %}<p class="muted small">Last updated: {{ last_updated.strftime('%Y-%m-%d %H:%M') }} UTC</p>{% endif %}
   </div>
 
   <form class="search" method="get">
@@ -74,7 +74,7 @@
       {% endif %}
     </article>
   {% else %}
-    <p>No competitions found.</p>
+    <section class="card empty-state"><h2>No competitions found</h2><p class="muted">Try a broader keyword or clear one of the filters.</p></section>
   {% endfor %}
 </div>
 {% endblock %}
