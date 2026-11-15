@@ -96,15 +96,18 @@ with tempfile.TemporaryDirectory() as td:
     original = db.DB_PATH
     db.DB_PATH = Path(td) / 'test.db'
     try:
+        db.reset_engine_for_tests()
         db.init_db()
         conn = db.get_db()
-        conn.execute("INSERT INTO users(name,university,email,password_hash,skills,availability,preferred_role,working_style,project_goal) VALUES (?,?,?,?,?,?,?,?,?)",
-                     ('U','Uni','u@uni.edu','x','Coding,Design','Weekday evenings','Data / Coding','Structured and planned','High quality / ambitious'))
+        conn.execute("""INSERT INTO users(name,university,email,password_hash,skills,availability,preferred_role,working_style,project_goal)
+                     VALUES (:name,:university,:email,:password_hash,:skills,:availability,:preferred_role,:working_style,:project_goal)""",
+                     {'name':'U','university':'Uni','email':'u@uni.edu','password_hash':'x','skills':'Coding,Design','availability':'Weekday evenings','preferred_role':'Data / Coding','working_style':'Structured and planned','project_goal':'High quality / ambitious'})
         uid = conn.execute('SELECT id FROM users').fetchone()['id']
-        conn.execute("INSERT INTO competitions(name) VALUES ('C')")
+        conn.execute("INSERT INTO competitions(name) VALUES (:name)", {'name':'C'})
         cid = conn.execute('SELECT id FROM competitions').fetchone()['id']
-        conn.execute("INSERT INTO teams(competition_id,owner_id,title,needed_skills,needed_role,availability,working_style,project_goal,members_needed) VALUES (?,?,?,?,?,?,?,?,?)",
-                     (cid,uid,'T','Coding,Design','Data / Coding','Weekday evenings','Structured and planned','High quality / ambitious',1))
+        conn.execute("""INSERT INTO teams(competition_id,owner_id,title,needed_skills,needed_role,availability,working_style,project_goal,members_needed)
+                     VALUES (:competition_id,:owner_id,:title,:needed_skills,:needed_role,:availability,:working_style,:project_goal,:members_needed)""",
+                     {'competition_id':cid,'owner_id':uid,'title':'T','needed_skills':'Coding,Design','needed_role':'Data / Coding','availability':'Weekday evenings','working_style':'Structured and planned','project_goal':'High quality / ambitious','members_needed':1})
         tid = conn.execute('SELECT id FROM teams').fetchone()['id']
         conn.commit(); conn.close()
         before, _, factors = score(user(), team())
@@ -114,13 +117,15 @@ with tempfile.TemporaryDirectory() as td:
         check('Attack 4 no person-level rejection penalty', before == after == 100, f'before={before}, after={after}')
     finally:
         db.DB_PATH = original
+        db.reset_engine_for_tests()
 
 # Attack 5 — existing authorization guards remain present; raw feedback is not rendered in the founder summary.
 app_source = Path('app.py').read_text()
 learning_template = Path('templates/learning.html').read_text()
 auth_guards = (
-    'if team["owner_id"]!=owner["id"]: conn.close(); abort(403)' in app_source
-    and 'if app_row["owner_id"]!=session["user_id"]: conn.close(); abort(403)' in app_source
+    'if team["owner_id"] != owner["id"]:' in app_source
+    and 'if app_row["owner_id"] != session["user_id"]:' in app_source
+    and '@admin_required' in app_source
     and 'summary.rows' not in learning_template
 )
 check('Attack 5 authorization/data exposure', auth_guards, 'owner-only applicant/application guards present; raw feedback rows not rendered')
@@ -130,9 +135,10 @@ with tempfile.TemporaryDirectory() as td:
     original = db.DB_PATH
     db.DB_PATH = Path(td) / 'learning.db'
     try:
+        db.reset_engine_for_tests()
         db.init_db()
         conn = db.get_db()
-        conn.execute("UPDATE matching_settings SET skills=.30, availability=.25, preferred_role=.20, working_style=.10, project_goal=.15 WHERE id=1")
+        conn.execute("UPDATE matching_settings SET skills=.30, availability=.25, preferred_role=.20, working_style=.10, project_goal=.15 WHERE id=:id", {'id':1})
         conn.commit(); conn.close()
         active_before = matching.get_active_weights()
         dynamic_score, dynamic_reasons, _ = matching.compatibility(user(skills='Research,Presentation'), team(skills='Coding,Design'), active_before)
@@ -140,6 +146,7 @@ with tempfile.TemporaryDirectory() as td:
         check('Session 7 active weights preserved under penalties', active_before['availability'] == .25 and dynamic_score == 45, f'weights={active_before}; score={dynamic_score}')
     finally:
         db.DB_PATH = original
+        db.reset_engine_for_tests()
 
 print('SESSION8_TESTS_OK')
 for name, ok, detail in results:

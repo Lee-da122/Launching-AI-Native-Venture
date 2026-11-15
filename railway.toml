@@ -1,0 +1,8 @@
+[build]
+builder = "railpack"
+
+[deploy]
+preDeployCommand = ["python init_db.py"]
+startCommand = "gunicorn app:app --bind 0.0.0.0:$PORT"
+healthcheckPath = "/healthz"
+healthcheckTimeout = 120

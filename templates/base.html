@@ -14,7 +14,7 @@
       {% if logged_in_user %}
         <span class="nav-user">{{ logged_in_user.name }}</span>
         <a href="{{ url_for('dashboard') }}">Home</a>
-        <a href="{{ url_for('learning_dashboard') }}">Learning review</a>
+        {% if is_admin %}<a href="{{ url_for('learning_dashboard') }}">Learning review</a>{% endif %}
         <a href="{{ url_for('logout') }}">Logout</a>
       {% endif %}
     </div>

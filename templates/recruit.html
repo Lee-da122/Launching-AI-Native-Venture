@@ -12,6 +12,7 @@
 
 <section class="card form-card">
   <form method="post">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
     <label>Team / post title *</label>
     <input name="title" required placeholder="e.g. Need one data teammate">
 

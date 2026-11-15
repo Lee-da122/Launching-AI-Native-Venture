@@ -31,3 +31,9 @@ Session 7 regression:
 
 Environment note:
 - full Flask browser test not run in build environment because Flask package installation was unavailable
+
+## Phase 2 — PostgreSQL / Railway readiness
+
+Implemented only deployment-readiness work: SQLAlchemy Core/Engine DB layer, PostgreSQL `DATABASE_URL`, local SQLite fallback, explicit idempotent schema initialization, separate competition/demo seed commands, production `SECRET_KEY`, `ADMIN_EMAIL` backend authorization, production-disabled demo feedback by default, session-backed CSRF, secure production cookies, Gunicorn, Railway config, and `/healthz`.
+
+No Phase 3 crawler, same-university filter, UI redesign, AI recommendation feature, messaging, or OAuth was added.

@@ -1,81 +1,190 @@
-# TeamMatch MVP
+# TeamMatch MVP — PostgreSQL / Railway-ready Phase 2
 
-A Flask + SQLite MVP for university teammate matching with an explainable human-controlled feedback learning loop.
+TeamMatch is a Flask + Jinja MVP for university teammate matching. Phase 2 keeps the existing product flow and matching/learning behavior while replacing direct SQLite assumptions with a small SQLAlchemy Core/Engine database layer.
 
-## Flow
-**Sign Up + Profile -> Login -> Join or Recruit -> Search/Select Competition -> Matching -> Human final decision**
+## Architecture
 
-Learning loop:
-**Recommendation -> Accept/Reject -> optional reason -> summary -> proposed weight change -> founder review -> approval -> future matching uses approved weights**
-
-## Development-friendly structure
 ```text
-TeamMatch/
-├─ app.py                 # routes and page flow
-├─ db.py                  # SQLite schema / connection
-├─ matching.py            # compatibility scoring
-├─ learning.py            # feedback loop / weight proposals
-├─ requirements.txt
-├─ templates/
-│  ├─ base.html
-│  ├─ login.html
-│  ├─ signup.html
-│  ├─ dashboard.html
-│  ├─ competitions.html
-│  ├─ teams.html
-│  ├─ recruit.html
-│  ├─ applicants.html
-│  └─ learning.html
-├─ static/
-│  └─ style.css
-├─ architecturedoc.md
-├─ scope.md
-└─ BUILD_NOTE.txt
+Browser
+  -> Flask + Jinja
+  -> SQLAlchemy Core/Engine database layer
+  -> SQLite locally (default) OR PostgreSQL when DATABASE_URL is set
 ```
 
-This keeps the existing Flask MVP while separating the parts most likely to change in future sessions.
+Existing product behavior remains: sign up/login, profile, Join/Recruit, competition search, team matching/explanations, shortlist/apply, applicant decisions, Session 7 feedback learning, Session 8 mismatch penalties and search guardrail.
 
-## Initial matching weights
-- Skills: 35%
-- Availability: 20%
-- Preferred role: 20%
-- Working style: 10%
-- Project goals: 15%
+## Local development (Windows / VS Code)
 
-Approved proposals can update these weights. The total remains 100%.
-
-## Session 7 feedback
-Recommendation cards include Accept/Reject plus optional reason/comment.
-Reasons: Availability, Skill fit, Preferred role, Working style, Project goals, Other.
-
-Feedback used for learning stores the score, factor scores and weight snapshot from the time of the recommendation.
-Users can turn off use of their recommendation feedback for TeamMatch learning without losing normal product functionality.
-
-## Proposal rule
-A mapped rejection reason must occur at least 5 times before it can trigger a proposal.
-The relevant weight is proposed at +5 percentage points and other weights are proportionally reduced.
-The proposal is Pending until a human explicitly Approves or Rejects it.
-
-## Run on Windows / VS Code
-Open this project folder in VS Code -> Terminal -> New Terminal.
+Install dependencies:
 
 ```powershell
 py -m pip install -r requirements.txt
+```
+
+Initialize the local SQLite schema:
+
+```powershell
+py init_db.py
+```
+
+Seed only the four local competition fixtures:
+
+```powershell
+py seed_competitions.py
+```
+
+Optional: add labelled demo users/teams with known demo passwords:
+
+```powershell
+py seed_demo.py
+```
+
+If you want local founder/admin access, set the admin email before starting:
+
+```powershell
+$env:ADMIN_EMAIL="demo.recruiter@university.edu"
+```
+
+Run locally:
+
+```powershell
 py app.py
 ```
 
-If `py` does not work:
+Open `http://127.0.0.1:5000`.
+
+If `DATABASE_URL` is absent, TeamMatch uses `teammatch.db` through SQLAlchemy's SQLite driver. The local development server initializes missing schema safely, but it no longer auto-creates demo accounts.
+
+## PostgreSQL
+
+Set `DATABASE_URL` to a PostgreSQL connection string. Railway's ordinary `postgresql://...` URL is normalized internally to SQLAlchemy's psycopg driver.
+
+Example shell setup (do not commit real credentials):
+
 ```powershell
-python -m pip install -r requirements.txt
-python app.py
+$env:DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DB"
+$env:SECRET_KEY="replace-with-a-long-random-value"
+$env:ADMIN_EMAIL="founder@example.edu"
+$env:APP_ENV="production"
+py init_db.py
 ```
 
-Open: `http://127.0.0.1:5000`
+`init_db.py` is idempotent: it creates missing tables and the matching-settings singleton, and does not drop or reset existing data.
 
-## Demo logins
-Join/recommendation demo: `demo.student@university.edu` / `demo1234`
+## Demo data separation
 
-Recruiter demo: `demo.recruiter@university.edu` / `demo1234`
+Schema setup and demo data are separate:
 
-## Important safety boundary
-TeamMatch never creates a permanent good/bad teammate score. Feedback changes compatibility-factor weights only.
+- `python init_db.py` — schema only
+- `python seed_competitions.py` — competition fixtures only
+- `python seed_demo.py` — optional known-password demo accounts and teams
+
+Production does **not** auto-create demo users. The login page hides demo credentials in production.
+
+## Admin / founder controls
+
+Learning-loop administration is protected on the backend by `ADMIN_EMAIL`.
+
+Only the logged-in user whose email exactly matches `ADMIN_EMAIL` may access:
+
+- `GET /learning`
+- `POST /learning/generate-proposal`
+- `POST /learning/proposal/<id>/approve`
+- `POST /learning/proposal/<id>/reject`
+- `POST /learning/demo-feedback`
+
+Other logged-in users receive HTTP 403.
+
+`ENABLE_DEMO_FEEDBACK=true` must also be set to enable bulk demo-feedback creation in production. It is disabled by default in production.
+
+## CSRF and sessions
+
+All current POST forms include a session-backed CSRF token and `app.py` validates it before processing POST requests.
+
+Production sessions use:
+
+- Secure cookie: enabled
+- HttpOnly: enabled
+- SameSite=Lax
+
+`SECRET_KEY` is required in production. Local development has a clearly marked development fallback only.
+
+## Health check
+
+`GET /healthz` verifies application/database connectivity and returns:
+
+```json
+{"status":"ok"}
+```
+
+with HTTP 200 only when the database query succeeds.
+
+## Railway deployment
+
+The repository includes `railway.toml`:
+
+```toml
+[deploy]
+preDeployCommand = ["python init_db.py"]
+startCommand = "gunicorn app:app --bind 0.0.0.0:$PORT"
+healthcheckPath = "/healthz"
+```
+
+Required Railway app variables:
+
+```text
+APP_ENV=production
+SECRET_KEY=<long random secret>
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+ADMIN_EMAIL=<founder/admin login email>
+ENABLE_DEMO_FEEDBACK=false
+```
+
+Recommended first deployment flow:
+
+1. Create Railway project and app service from the GitHub repo.
+2. Add a PostgreSQL service.
+3. In the app service, set `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
+4. Set `APP_ENV=production`, `SECRET_KEY`, `ADMIN_EMAIL`, and keep `ENABLE_DEMO_FEEDBACK=false`.
+5. Deploy. `python init_db.py` runs as the pre-deploy schema step.
+6. If you want the four placeholder competitions for Demo Day, run `python seed_competitions.py` once against the production database.
+7. Confirm `/healthz` is HTTP 200, then run the regression checklist.
+
+Do not use local `teammatch.db` as Railway production persistence.
+
+## Tests
+
+Session 8 benchmark:
+
+```powershell
+py session8_tests.py
+```
+
+Phase 2 DB/learning/config checks:
+
+```powershell
+py phase2_tests.py
+```
+
+The repository's latest test evidence is documented in `PHASE2_TEST_RESULT.md`.
+
+## Matching behavior preserved
+
+Baseline weights remain:
+
+- Skills 35%
+- Availability 20%
+- Preferred role 20%
+- Working style 10%
+- Project goal 15%
+
+Approved active weights in `matching_settings` override these defaults.
+
+Session 8 post-score penalties remain:
+
+- no required-skill overlap: -25
+- non-flexible preferred-role mismatch: -20
+- opposite project-effort goals: -20
+- final score clamped to 0–100
+
+No permanent person-level reputation or good/bad teammate score is implemented.

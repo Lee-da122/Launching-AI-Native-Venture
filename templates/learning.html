@@ -36,8 +36,12 @@
   <h2>Generate a proposed weight change</h2>
   <p class="muted">Rule: a mapped rejection reason must appear at least 5 times. The most repeated factor is proposed at +5 percentage points; all other weights are reduced proportionally so the total stays 100%.</p>
   <div class="button-row">
-    <form method="post" action="{{ url_for('learning_generate_proposal') }}"><button class="primary compact" type="submit">Generate proposal</button></form>
-    <form method="post" action="{{ url_for('learning_demo_feedback') }}"><button class="secondary" type="submit">Add labelled demo feedback</button></form>
+    <form method="post" action="{{ url_for('learning_generate_proposal') }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="primary compact" type="submit">Generate proposal</button></form>
+    {% if demo_feedback_enabled %}
+    <form method="post" action="{{ url_for('learning_demo_feedback') }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="secondary" type="submit">Add labelled demo feedback</button></form>
+    {% endif %}
   </div>
 </section>
 
@@ -54,8 +58,10 @@
       <p class="muted small">Evidence: {{ p.row.feedback_count }} relevant feedback records.</p>
       {% if p.row.status == 'Pending' %}
       <div class="button-row">
-        <form method="post" action="{{ url_for('learning_review', proposal_id=p.row.id, action='approve') }}"><button class="primary compact" type="submit">Approve</button></form>
-        <form method="post" action="{{ url_for('learning_review', proposal_id=p.row.id, action='reject') }}"><button class="secondary" type="submit">Reject</button></form>
+        <form method="post" action="{{ url_for('learning_review', proposal_id=p.row.id, action='approve') }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="primary compact" type="submit">Approve</button></form>
+        <form method="post" action="{{ url_for('learning_review', proposal_id=p.row.id, action='reject') }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="secondary" type="submit">Reject</button></form>
       </div>
       {% endif %}
     </div>

@@ -9,6 +9,7 @@
     <p class="muted">University email is required. Email verification is intentionally outside this MVP.</p>
 
     <form method="post">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <div class="two-col">
         <div>
           <label>Name *</label>

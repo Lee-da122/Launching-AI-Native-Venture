@@ -24,7 +24,7 @@ def split_values(text):
 def get_active_weights(conn=None):
     owns = conn is None
     conn = conn or get_db()
-    row = conn.execute("SELECT * FROM matching_settings WHERE id = 1").fetchone()
+    row = conn.execute("SELECT * FROM matching_settings WHERE id = :id", {"id": 1}).fetchone()
     if owns:
         conn.close()
     if not row:

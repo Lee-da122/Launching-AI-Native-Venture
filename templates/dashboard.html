@@ -29,6 +29,7 @@
     <p class="muted">Your feedback may be used to improve future teammate recommendations. This changes matching-factor weights only; it never creates a permanent score for a person.</p>
   </div>
   <form method="post" action="{{ url_for('feedback_preference') }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
     <label class="toggle-row">
       <input type="checkbox" name="feedback_opt_in" {% if logged_in_user.feedback_opt_in %}checked{% endif %}>
       Use my recommendation feedback to improve TeamMatch

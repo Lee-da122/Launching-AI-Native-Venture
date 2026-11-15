@@ -1,6 +1,7 @@
 import json
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
+
 from db import get_db
 from matching import get_active_weights
 
@@ -22,12 +23,20 @@ def save_feedback(user_id, team_id, decision, reason, comment, score, factor_sco
         """INSERT INTO recommendation_feedback
            (user_id, team_id, decision, reason, comment, matching_score,
             factor_scores_json, weights_json, use_for_learning, demo)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (
-            user_id, team_id, decision, reason or None, comment or None, float(score),
-            json.dumps(factor_scores, sort_keys=True), json.dumps(weights, sort_keys=True),
-            1 if use_for_learning else 0, 1 if demo else 0,
-        ),
+           VALUES (:user_id, :team_id, :decision, :reason, :comment, :matching_score,
+                   :factor_scores_json, :weights_json, :use_for_learning, :demo)""",
+        {
+            "user_id": user_id,
+            "team_id": team_id,
+            "decision": decision,
+            "reason": reason or None,
+            "comment": comment or None,
+            "matching_score": float(score),
+            "factor_scores_json": json.dumps(factor_scores, sort_keys=True),
+            "weights_json": json.dumps(weights, sort_keys=True),
+            "use_for_learning": bool(use_for_learning),
+            "demo": bool(demo),
+        },
     )
     conn.commit()
     conn.close()
@@ -36,7 +45,8 @@ def save_feedback(user_id, team_id, decision, reason, comment, score, factor_sco
 def feedback_summary():
     conn = get_db()
     rows = conn.execute(
-        "SELECT * FROM recommendation_feedback WHERE use_for_learning = 1 ORDER BY created_at DESC"
+        "SELECT * FROM recommendation_feedback WHERE use_for_learning = :enabled ORDER BY created_at DESC",
+        {"enabled": True},
     ).fetchall()
     conn.close()
 
@@ -66,9 +76,8 @@ def _normalize_with_increase(weights, target, step=WEIGHT_STEP):
     other_total = sum(proposed[k] for k in others)
     proposed[target] += increase
     if other_total > 0:
-        for k in others:
-            proposed[k] -= increase * (proposed[k] / other_total)
-    # Keep a clean total of exactly 1.0 after rounding.
+        for key in others:
+            proposed[key] -= increase * (proposed[key] / other_total)
     proposed = {k: round(v, 4) for k, v in proposed.items()}
     drift = round(1.0 - sum(proposed.values()), 4)
     proposed[others[-1]] = round(proposed[others[-1]] + drift, 4)
@@ -83,12 +92,16 @@ def generate_proposal():
             factor_counts[REASON_TO_FACTOR[row["reason"]]] += 1
     if not factor_counts:
         return None
+
     factor, count = factor_counts.most_common(1)[0]
     if count < MIN_REJECTIONS_FOR_FACTOR:
         return None
 
     conn = get_db()
-    pending = conn.execute("SELECT * FROM weight_proposals WHERE status = 'Pending' ORDER BY id DESC LIMIT 1").fetchone()
+    pending = conn.execute(
+        "SELECT * FROM weight_proposals WHERE status = :status ORDER BY id DESC LIMIT 1",
+        {"status": "Pending"},
+    ).fetchone()
     if pending:
         conn.close()
         return pending
@@ -100,14 +113,21 @@ def generate_proposal():
         f"{main_reason} was selected in {count} learning-eligible rejection records. "
         f"The proposal increases its matching weight by 5 percentage points and redistributes the remaining weights proportionally."
     )
-    cur = conn.execute(
+    proposal = conn.execute(
         """INSERT INTO weight_proposals
            (factor, old_weights_json, proposed_weights_json, reason, feedback_count, main_reason)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        (factor, json.dumps(weights, sort_keys=True), json.dumps(proposed, sort_keys=True), reason_text, count, main_reason),
-    )
+           VALUES (:factor, :old_weights_json, :proposed_weights_json, :reason, :feedback_count, :main_reason)
+           RETURNING *""",
+        {
+            "factor": factor,
+            "old_weights_json": json.dumps(weights, sort_keys=True),
+            "proposed_weights_json": json.dumps(proposed, sort_keys=True),
+            "reason": reason_text,
+            "feedback_count": count,
+            "main_reason": main_reason,
+        },
+    ).fetchone()
     conn.commit()
-    proposal = conn.execute("SELECT * FROM weight_proposals WHERE id = ?", (cur.lastrowid,)).fetchone()
     conn.close()
     return proposal
 
@@ -115,8 +135,12 @@ def generate_proposal():
 def review_proposal(proposal_id, action):
     if action not in {"Approved", "Rejected"}:
         raise ValueError("Invalid review action")
+
     conn = get_db()
-    proposal = conn.execute("SELECT * FROM weight_proposals WHERE id = ?", (proposal_id,)).fetchone()
+    proposal = conn.execute(
+        "SELECT * FROM weight_proposals WHERE id = :proposal_id",
+        {"proposal_id": proposal_id},
+    ).fetchone()
     if not proposal or proposal["status"] != "Pending":
         conn.close()
         return False
@@ -126,19 +150,30 @@ def review_proposal(proposal_id, action):
         new_weights = json.loads(proposal["proposed_weights_json"])
         conn.execute(
             """UPDATE matching_settings
-               SET skills=?, availability=?, preferred_role=?, working_style=?, project_goal=?, updated_at=CURRENT_TIMESTAMP
-               WHERE id=1""",
-            (new_weights["skills"], new_weights["availability"], new_weights["preferred_role"], new_weights["working_style"], new_weights["project_goal"]),
+               SET skills=:skills, availability=:availability, preferred_role=:preferred_role,
+                   working_style=:working_style, project_goal=:project_goal,
+                   updated_at=CURRENT_TIMESTAMP
+               WHERE id=:id""",
+            {"id": 1, **new_weights},
         )
         conn.execute(
             """INSERT INTO weight_history(old_weights_json, new_weights_json, reason, feedback_count)
-               VALUES (?, ?, ?, ?)""",
-            (json.dumps(old_weights, sort_keys=True), json.dumps(new_weights, sort_keys=True), proposal["reason"], proposal["feedback_count"]),
+               VALUES (:old_weights_json, :new_weights_json, :reason, :feedback_count)""",
+            {
+                "old_weights_json": json.dumps(old_weights, sort_keys=True),
+                "new_weights_json": json.dumps(new_weights, sort_keys=True),
+                "reason": proposal["reason"],
+                "feedback_count": proposal["feedback_count"],
+            },
         )
 
     conn.execute(
-        "UPDATE weight_proposals SET status=?, reviewed_at=? WHERE id=?",
-        (action, datetime.utcnow().isoformat(timespec="seconds"), proposal_id),
+        "UPDATE weight_proposals SET status=:status, reviewed_at=:reviewed_at WHERE id=:proposal_id",
+        {
+            "status": action,
+            "reviewed_at": datetime.now(timezone.utc).replace(tzinfo=None),
+            "proposal_id": proposal_id,
+        },
     )
     conn.commit()
     conn.close()
@@ -146,7 +181,12 @@ def review_proposal(proposal_id, action):
 
 
 def add_demo_feedback(user_id, team_id, score, factors, weights):
-    # Clearly labelled demo records; enough Availability rejections to exercise the threshold.
     for _ in range(MIN_REJECTIONS_FOR_FACTOR):
-        save_feedback(user_id, team_id, "Reject", "Availability", "Demo feedback for Session 7 loop", score, factors, weights, True, demo=True)
-    save_feedback(user_id, team_id, "Accept", "Project goals", "Demo acceptance", score, factors, weights, True, demo=True)
+        save_feedback(
+            user_id, team_id, "Reject", "Availability",
+            "Demo feedback for Session 7 loop", score, factors, weights, True, demo=True,
+        )
+    save_feedback(
+        user_id, team_id, "Accept", "Project goals",
+        "Demo acceptance", score, factors, weights, True, demo=True,
+    )

@@ -9,6 +9,7 @@
     <p class="muted">Find or recruit teammates for university competitions and projects.</p>
 
     <form method="post">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <label>University email</label>
       <input type="email" name="email" required placeholder="you@university.edu">
 
@@ -20,12 +21,14 @@
 
     <p class="auth-note">New here? <a href="{{ url_for('signup') }}">Create an account + profile</a></p>
 
+    {% if show_demo_credentials %}
     <div class="demo-box">
       <strong>Joiner demo</strong><br>
       demo.student@university.edu · demo1234<br><br>
       <strong>Recruiter demo</strong><br>
       demo.recruiter@university.edu · demo1234
     </div>
+    {% endif %}
   </section>
 </div>
 {% endblock %}

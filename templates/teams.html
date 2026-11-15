@@ -43,6 +43,7 @@
         <div class="feedback-box">
           <strong>Was this recommendation useful?</strong>
           <form method="post" action="{{ url_for('recommendation_feedback', team_id=item.team.id) }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
             <div class="feedback-grid">
               <select name="reason" aria-label="Feedback reason">
                 <option value="">Optional reason</option>
@@ -60,12 +61,14 @@
 
         <div class="button-row">
           <form method="post" action="{{ url_for('shortlist_team', team_id=item.team.id) }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
             <button class="secondary" type="submit">{{ "Remove shortlist" if item.shortlisted else "Shortlist" }}</button>
           </form>
           {% if item.application_status %}
             <button class="disabled" disabled>Applied · {{ item.application_status }}</button>
           {% else %}
             <form method="post" action="{{ url_for('apply_team', team_id=item.team.id) }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
               <button class="primary compact" type="submit">Apply to team</button>
             </form>
           {% endif %}

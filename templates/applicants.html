@@ -39,9 +39,11 @@
         <div class="button-row">
           {% if item.applicant.status == "Pending" %}
             <form method="post" action="{{ url_for('update_application', application_id=item.applicant.application_id, status='Accepted') }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
               <button class="primary compact" type="submit">Accept</button>
             </form>
             <form method="post" action="{{ url_for('update_application', application_id=item.applicant.application_id, status='Rejected') }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
               <button class="secondary" type="submit">Reject</button>
             </form>
           {% else %}
