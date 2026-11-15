@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 {% block title %}Competitions · TeamMatch{% endblock %}
 {% block content %}
@@ -6,12 +5,28 @@
   <div>
     <div class="eyebrow">{{ "Join a Team" if mode == "join" else "Recruit a Team" }}</div>
     <h1>Choose a competition</h1>
-    <p class="muted">Search the demo competition list and continue with one event.</p>
+    <p class="muted">Search current South Korean opportunities and continue with one competition.</p>
+    {% if last_updated %}<p class="muted small">Competition data last fetched: {{ last_updated.strftime('%Y-%m-%d') }}</p>{% endif %}
   </div>
 
   <form class="search" method="get">
     <input type="hidden" name="mode" value="{{ mode }}">
     <input name="q" value="{{ q }}" placeholder="Search competitions...">
+    <select name="category">
+      <option value="">All categories</option>
+      {% for item in categories %}
+        <option value="{{ item }}" {% if category == item %}selected{% endif %}>{{ item }}</option>
+      {% endfor %}
+    </select>
+    <select name="status">
+      <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
+      <option value="all" {% if status == 'all' %}selected{% endif %}>All</option>
+      <option value="expired" {% if status == 'expired' %}selected{% endif %}>Expired</option>
+    </select>
+    <select name="deadline">
+      <option value="" {% if not deadline_filter %}selected{% endif %}>Any deadline</option>
+      <option value="soon" {% if deadline_filter == 'soon' %}selected{% endif %}>Closing within 14 days</option>
+    </select>
     <button type="submit">Search</button>
   </form>
 </section>
@@ -21,12 +36,25 @@
 {% endif %}
 
 <div class="competition-grid">
-  {% for competition in competitions %}
+  {% for item in competitions %}
+    {% set competition = item.competition %}
     <article class="card competition-card">
-      <div class="muted small">{{ competition.organizer }}</div>
+      <div class="muted small">
+        {{ competition.organizer or "Organizer not specified" }}
+        {% if competition.category %} · {{ competition.category }}{% endif %}
+      </div>
       <h2>{{ competition.name }}</h2>
-      <p>{{ competition.description }}</p>
-      <div class="deadline">Deadline: {{ competition.deadline }}</div>
+      <p>{{ competition.description or "See original competition page for details." }}</p>
+      <div class="deadline">
+        Deadline: {{ competition.deadline or "Not specified" }}
+        {% if item.dday %} · {{ item.dday }}{% endif %}
+      </div>
+      <div class="muted small">Eligibility: {{ competition.eligibility or "Not specified" }}</div>
+      {% if competition.participation_type %}<div class="muted small">Participation: {{ competition.participation_type }}</div>{% endif %}
+      {% if competition.source_name %}<div class="muted small">Source: {{ competition.source_name }}</div>{% endif %}
+      {% if competition.source_url %}
+        <a href="{{ competition.source_url }}" target="_blank" rel="noopener noreferrer">View original listing</a>
+      {% endif %}
 
       {% if mode == "join" %}
         <a class="primary-link" href="{{ url_for('competition_teams', competition_id=competition.id) }}">Find teams</a>

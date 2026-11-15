@@ -188,3 +188,58 @@ Session 8 post-score penalties remain:
 - final score clamped to 0–100
 
 No permanent person-level reputation or good/bad teammate score is implemented.
+
+## Phase 3 — Korean competition data
+
+TeamMatch Phase 3 uses two complementary South Korean sources:
+
+- **K-Startup Open API** (official public-data API) for structured startup/idea/competition announcements.
+- **WEVITY university competition pages** as a lightweight supplementary index for broader university-relevant contests such as AI/data, engineering, design, marketing and case-style competitions.
+
+K-Startup is accessed through its documented API. WEVITY is treated more conservatively: TeamMatch only reads a small number of publicly accessible university-contest pages, stores minimal metadata, uses low-frequency sequential requests, and links users back to the original WEVITY listing. No CAPTCHA, login, anti-bot mechanism, rate limit or access control is bypassed. During source review, no explicit automated-access permission was found for WEVITY, so this integration should be described as a limited public-page metadata collector rather than as an officially licensed feed.
+
+TeamMatch stores source provenance and does not claim to cover every Korean competition.
+
+### What is collected
+
+The collector keeps competition-style opportunities realistically relevant to university users. It excludes obvious recruiting-only items such as ordinary supporter, mentoring, academy, volunteer, hiring and event listings unless the title clearly represents a contest/competition.
+
+Stored fields include title, organizer, deadline, category, eligibility, participation type when explicitly inferable, original source listing URL, source-specific external ID, fetch timestamp and active/expired status. WEVITY detail text and poster images are not copied into TeamMatch; the fallback description is `See original competition page for details.` Missing factual fields remain missing and no LLM is used to invent them.
+
+Collection volume is deliberately capped for Demo Day reliability: K-Startup uses a small current-page limit and WEVITY uses at most two list pages / forty sequential detail requests per run.
+
+### Manual sync
+
+The manual command is always:
+
+```powershell
+py sync_competitions.py
+```
+
+If a data.go.kr K-Startup service key is available, set it before running:
+
+```powershell
+$env:K_STARTUP_SERVICE_KEY="<your service key>"
+py sync_competitions.py
+```
+
+Without a K-Startup key, that source fails safely and the WEVITY source can still synchronize. If one source fails, the other source continues. Only when every configured source fails does the command exit non-zero, and existing database rows are preserved.
+
+The primary source identity is `source_name + external_id`. A conservative cross-source duplicate check additionally compares normalized title + organizer + exact deadline. It does not use aggressive fuzzy matching. Existing TeamMatch competition IDs are updated in place rather than deleted/reinserted, so team/application history remains valid.
+
+When the same item appears in both sources, K-Startup provenance has priority because it is the official structured source; the TeamMatch row ID remains unchanged.
+
+### Scheduled sync on Railway
+
+After a successful manual production sync, create a separate Railway service from the same repository with:
+
+```text
+Start command: python sync_competitions.py
+Cron: once daily
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+K_STARTUP_SERVICE_KEY=<optional Railway secret>
+```
+
+Daily refresh is enough for the MVP. The normal Flask web service never contacts either external source during user page requests; it only reads PostgreSQL.
+
+`seed_competitions.py` remains a local/offline development fallback. Seed rows are marked `source_name=Demo` and are hidden from production competition discovery.

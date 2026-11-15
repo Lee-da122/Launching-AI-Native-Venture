@@ -5,6 +5,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -57,6 +58,18 @@ competitions = Table(
     Column("organizer", Text),
     Column("deadline", Text),
     Column("description", Text),
+    Column("category", Text),
+    Column("eligibility", Text),
+    Column("participation_type", Text),
+    Column("source_name", Text),
+    Column("source_url", Text),
+    Column("external_id", Text),
+    Column("fetched_at", DateTime(timezone=True)),
+    Column("updated_at", DateTime(timezone=True)),
+    Column("is_active", Boolean, nullable=False, server_default=text("TRUE")),
+    Column("application_start_date", Date),
+    Column("deadline_date", Date),
+    Column("original_deadline_text", Text),
 )
 
 teams = Table(
@@ -251,6 +264,36 @@ def init_db():
                 conn.execute(text("ALTER TABLE users ADD COLUMN feedback_opt_in BOOLEAN NOT NULL DEFAULT TRUE"))
             else:
                 conn.execute(text("ALTER TABLE users ADD COLUMN feedback_opt_in INTEGER NOT NULL DEFAULT 1"))
+
+    # Phase 3 compatibility migration: add competition provenance/search fields without
+    # deleting or recreating existing rows referenced by teams.
+    competition_columns = {c["name"] for c in inspect(engine).get_columns("competitions")}
+    competition_additions = {
+        "category": "TEXT",
+        "eligibility": "TEXT",
+        "participation_type": "TEXT",
+        "source_name": "TEXT",
+        "source_url": "TEXT",
+        "external_id": "TEXT",
+        "fetched_at": "TIMESTAMPTZ" if engine.dialect.name == "postgresql" else "DATETIME",
+        "updated_at": "TIMESTAMPTZ" if engine.dialect.name == "postgresql" else "DATETIME",
+        "is_active": "BOOLEAN NOT NULL DEFAULT TRUE" if engine.dialect.name == "postgresql" else "INTEGER NOT NULL DEFAULT 1",
+        "application_start_date": "DATE",
+        "deadline_date": "DATE",
+        "original_deadline_text": "TEXT",
+    }
+    with engine.begin() as migration_conn:
+        for column_name, column_type in competition_additions.items():
+            if column_name not in competition_columns:
+                migration_conn.execute(text(f"ALTER TABLE competitions ADD COLUMN {column_name} {column_type}"))
+        migration_conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_competitions_source_external "
+            "ON competitions(source_name, external_id)"
+        ))
+        migration_conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_competitions_active_deadline "
+            "ON competitions(is_active, deadline_date)"
+        ))
 
     conn = get_db()
     existing = conn.execute("SELECT id FROM matching_settings WHERE id = :id", {"id": 1}).fetchone()

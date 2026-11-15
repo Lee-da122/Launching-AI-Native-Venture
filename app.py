@@ -2,6 +2,8 @@ import hmac
 import json
 import os
 import secrets
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from functools import wraps
 
 from flask import Flask, abort, flash, jsonify, redirect, render_template, request, session, url_for
@@ -39,6 +41,7 @@ AVAILABILITY = ["Weekday daytime", "Weekday evenings", "Weekends", "Flexible / N
 ROLES = ["Research", "Data / Coding", "Design", "Presentation", "Project management", "Flexible"]
 WORKING_STYLES = ["Structured and planned", "Flexible and adaptive", "Fast-paced", "Discussion-oriented"]
 PROJECT_GOALS = ["High quality / ambitious", "Balanced effort", "Minimum viable effort"]
+KOREA_TZ = ZoneInfo("Asia/Seoul")
 
 
 def login_required(view):
@@ -264,29 +267,82 @@ def feedback_preference():
 def competitions():
     mode = request.args.get("mode", "join")
     q = request.args.get("q", "").strip()
+    category = request.args.get("category", "").strip()
+    status = request.args.get("status", "active").strip().lower()
+    deadline_filter = request.args.get("deadline", "").strip().lower()
 
     if q and is_out_of_scope_search(q):
         return render_template(
-            "competitions.html", competitions=[], mode=mode, q=q,
-            scope_message=SCOPE_MESSAGE,
+            "competitions.html", competitions=[], mode=mode, q=q, category=category,
+            status=status, deadline_filter=deadline_filter, categories=[],
+            scope_message=SCOPE_MESSAGE, last_updated=None,
         )
 
-    conn = get_db()
+    clauses = []
+    params = {}
     if q:
-        pattern = f"%{q.lower()}%"
-        rows = conn.execute(
-            """SELECT * FROM competitions
-               WHERE LOWER(name) LIKE :pattern
-                  OR LOWER(COALESCE(organizer, '')) LIKE :pattern
-                  OR LOWER(COALESCE(description, '')) LIKE :pattern
-               ORDER BY deadline""",
-            {"pattern": pattern},
-        ).fetchall()
-    else:
-        rows = conn.execute("SELECT * FROM competitions ORDER BY deadline").fetchall()
+        clauses.append(
+            "(LOWER(name) LIKE :pattern OR LOWER(COALESCE(organizer, '')) LIKE :pattern "
+            "OR LOWER(COALESCE(description, '')) LIKE :pattern OR LOWER(COALESCE(category, '')) LIKE :pattern)"
+        )
+        params["pattern"] = f"%{q.lower()}%"
+    if category:
+        clauses.append("category = :category")
+        params["category"] = category
+    # Seed/demo rows remain useful locally but are not presented as current production data.
+    if IS_PRODUCTION:
+        clauses.append("source_name IS NOT NULL AND source_name <> 'Demo'")
+    if status == "active":
+        clauses.append("is_active = :active")
+        params["active"] = True
+    elif status == "expired":
+        clauses.append("is_active = :inactive")
+        params["inactive"] = False
+    if deadline_filter == "soon":
+        clauses.append("deadline_date IS NOT NULL AND deadline_date >= :today AND deadline_date <= :soon")
+        korea_today = datetime.now(KOREA_TZ).date()
+        params["today"] = korea_today
+        params["soon"] = korea_today + timedelta(days=14)
+
+    where_sql = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM competitions" + where_sql +
+        " ORDER BY CASE WHEN deadline_date IS NULL THEN 1 ELSE 0 END, deadline_date ASC, name ASC",
+        params,
+    ).fetchall()
+    category_sql = """SELECT DISTINCT category FROM competitions
+                      WHERE category IS NOT NULL AND category <> '' AND is_active = :active"""
+    if IS_PRODUCTION:
+        category_sql += " AND source_name IS NOT NULL AND source_name <> 'Demo'"
+    category_sql += " ORDER BY category"
+    categories = conn.execute(category_sql, {"active": True}).fetchall()
+    freshness = conn.execute(
+        "SELECT MAX(fetched_at) AS last_updated FROM competitions WHERE source_name IS NOT NULL AND source_name <> 'Demo'"
+    ).fetchone()
     conn.close()
+
+    enriched = []
+    today = datetime.now(KOREA_TZ).date()
+    for row in rows:
+        deadline_date = row.get("deadline_date")
+        if deadline_date:
+            days = (deadline_date - today).days
+            if days < 0:
+                dday = "Closed"
+            elif days == 0:
+                dday = "D-Day"
+            else:
+                dday = f"D-{days}"
+        else:
+            dday = None
+        enriched.append({"competition": row, "dday": dday})
+
     return render_template(
-        "competitions.html", competitions=rows, mode=mode, q=q, scope_message=None,
+        "competitions.html", competitions=enriched, mode=mode, q=q, category=category,
+        status=status, deadline_filter=deadline_filter,
+        categories=[item["category"] for item in categories],
+        scope_message=None, last_updated=freshness["last_updated"] if freshness else None,
     )
 
 

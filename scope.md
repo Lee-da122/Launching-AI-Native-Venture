@@ -1,6 +1,6 @@
-# TeamMatch MVP Scope — Phase 2
+# TeamMatch MVP Scope — Phase 3
 
-## Current production-ready scope
+## Current scope
 
 ### Account / profile
 - Sign up, login, logout
@@ -9,61 +9,53 @@
 - Skills, availability, preferred role, working style, project goal
 - Feedback-learning opt-out
 
-### Competition / team formation
-- Seedable local competition fixtures
-- Search + Session 8 out-of-scope guard
-- Join a Team
-- Recruit a Team
-- Recruiting posts and requirements
-- Shortlist, apply, application status
-- Recruiter applicant review and ownership checks
+### Competition discovery / team formation
+- South Korean competition-data collector using K-Startup Open API + limited WEVITY public-page metadata
+- PostgreSQL-backed competition search; no external source request during normal page rendering
+- Source provenance and original listing URL
+- Active/expired status and request-time D-day calculation
+- Category, status and closing-soon filters
+- Stable competition IDs through upsert rather than delete/reinsert
+- Conservative cross-source deduplication
+- Seed fixtures retained only for local/offline fallback
+- Join a Team / Recruit a Team modes preserved
+- Shortlist, apply, application status and recruiter applicant review preserved
 
-### Matching
+### Matching / learning / safety
 - Explainable weighted compatibility
 - Human-approved active weights
-- Session 8 critical mismatch penalties
-- Score clamp 0–100
-- Human final decision
-
-### Learning loop
-- Recommendation Accept/Reject feedback
-- Optional reason/comment
-- Score/factor/weight snapshot
-- Learning opt-out respected
-- Aggregate feedback summary
-- Threshold-based weight proposal
-- Human approval/rejection
-- Approved active weights used later
-- Weight history
-- No permanent teammate reputation
+- Session 8 critical mismatch penalties and score clamp
+- Session 8 scope guard
+- Session 7 feedback learning loop and opt-out
+- Admin-only learning controls
+- No permanent teammate reputation or rejection penalty
 
 ### Deployment / persistence
-- SQLAlchemy Core/Engine database layer
-- Local SQLite fallback
-- PostgreSQL via `DATABASE_URL`
-- Idempotent explicit schema initialization
-- Separate demo seeding
-- Gunicorn production start
-- Railway config-as-code
-- DB-aware `/healthz`
-- Environment-based production secrets
-- Backend founder/admin protection
-- Session-backed CSRF protection
+- Flask + Jinja + SQLAlchemy
+- Railway PostgreSQL via `DATABASE_URL`
+- Gunicorn + `/healthz`
+- Environment-based secret/admin settings
+- CSRF + secure production sessions
+- Phase 3 manual sync command: `python sync_competitions.py`
 
-## Still out of scope
+## Production activation still requires
 
-- Korean competition crawler
-- Railway Cron
+- Push this Phase 3 revision to GitHub
+- Redeploy the Railway web service so the schema/code update is live
+- Run one successful manual sync against Railway PostgreSQL
+- Verify the WEVITY parser against the live pages from Railway
+- Configure a separate once-daily Railway cron service after manual sync succeeds
+- Optional: add `K_STARTUP_SERVICE_KEY` to broaden coverage with the official K-Startup source
+
+Until those are completed, the multi-source implementation is tested with controlled fixtures but live production competition ingestion is not yet verified.
+
+## Out of scope
+
+- Global competition collection
 - Same-university matching/filter
-- Competition-category filters
-- External/global competition search
+- AI/LLM competition recommendations
 - New dashboard/match-card redesign
-- AI/LLM matching or competition recommendations
 - Chat / notifications / payments
 - OAuth
-- Skill-development recommendations
 - Permanent good/bad teammate scoring
-
-## Phase 2 definition of done
-
-The code is ready to run with SQLite locally and PostgreSQL in production without changing product behavior. Public Railway deployment still requires account-specific Railway/GitHub connection and production environment variables, followed by real PostgreSQL and public-URL regression tests.
+- Phase 4 work
