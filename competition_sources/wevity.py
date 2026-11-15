@@ -148,10 +148,18 @@ def is_relevant_title(title: str) -> bool:
     return False
 
 
-def parse_detail(detail_html: str, source_url: str, fetched_at: datetime | None = None) -> CompetitionRecord:
+def parse_detail(
+    detail_html: str,
+    source_url: str,
+    fetched_at: datetime | None = None,
+    listing_title: str | None = None,
+) -> CompetitionRecord:
     fetched_at = fetched_at or datetime.now(timezone.utc)
     soup = BeautifulSoup(detail_html, "html.parser")
-    title = _title_from_soup(soup)
+    # The WEVITY detail page contains shared navigation headings that can be
+    # mistaken for the contest title. The listing page already exposes the
+    # actual contest title, so prefer that stable value when available.
+    title = _clean(listing_title) or _title_from_soup(soup)
     query = parse_qs(urlparse(source_url).query)
     external_id = (query.get("ix") or [""])[0]
     if not title or not external_id:
@@ -222,10 +230,15 @@ def fetch_competitions() -> tuple[list[CompetitionRecord], dict[str, int]]:
             break
         time.sleep(REQUEST_DELAY_SECONDS)
 
-    for url, _title in links:
+    for url, listing_title in links:
         try:
             detail_html = _request_text(url)
-            record = parse_detail(detail_html, url, fetched_at=fetched_at)
+            record = parse_detail(
+                detail_html,
+                url,
+                fetched_at=fetched_at,
+                listing_title=listing_title,
+            )
             if not is_relevant_title(record.name):
                 skipped += 1
             else:

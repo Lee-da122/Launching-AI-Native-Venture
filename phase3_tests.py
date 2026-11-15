@@ -43,6 +43,22 @@ WEVITY_LIST_FIXTURE = """
 </body></html>
 """
 
+
+WEVITY_GENERIC_HEADING_FIXTURE = """
+<html>
+<head><title>공모전 대외활동 콘테스트 메인메뉴 - WEVITY</title></head>
+<body>
+<h6>공모전 대외활동 콘테스트 메인메뉴</h6>
+<ul>
+<li>분야 데이터/AI</li>
+<li>응모대상 대학생</li>
+<li>주최/주관 테스트기관</li>
+<li>접수기간 2026-11-01 ~ 2026-11-30</li>
+</ul>
+</body>
+</html>
+"""
+
 WEVITY_DETAIL_FIXTURE = """
 <html>
 <head><title>2026 대학생 AI 아이디어 공모전 - WEVITY(위비티) 공모전</title></head>
@@ -138,6 +154,15 @@ def main():
     assert w.deadline_date == date(2026, 12, 20)
     assert w.category == "Data / AI"
     assert w.description == "See original competition page for details."
+
+    # Production regression: shared page headings must never replace the listing title.
+    generic = parse_detail(
+        WEVITY_GENERIC_HEADING_FIXTURE,
+        "https://www.wevity.com/index_university.php?c=find&gbn=viewok&ix=998877&s=_university",
+        now,
+        listing_title="2026 실제 대학생 데이터 분석 경진대회",
+    )
+    assert generic.name == "2026 실제 대학생 데이터 분석 경진대회"
 
     # Idempotency and update-in-place for same source.
     upsert_records([normal])

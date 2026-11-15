@@ -16,3 +16,9 @@ Controlled local tests completed after adding the WEVITY supplementary source.
 - Phase 2 regression suite: PASS
 
 Important limitation: live WEVITY HTML fetching/parsing was not executed from this local build environment because outbound DNS is unavailable here. Live-source verification must be performed after deployment from Railway before claiming production ingestion is verified.
+
+## Production title parsing regression fix
+- Fixed WEVITY title extraction after production showed the shared page heading (`공모전 대외활동 콘테스트 메인메뉴`) as every competition title.
+- Collector now prefers the already-parsed listing title when parsing each detail page.
+- Added a controlled fixture where the detail page heading is generic but the listing title is a real competition title.
+- Result: PASS; existing Session 8 and Phase 2 regressions remain PASS.
