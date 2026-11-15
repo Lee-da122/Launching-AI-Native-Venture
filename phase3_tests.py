@@ -69,6 +69,26 @@ WEVITY_GENERIC_HEADING_FIXTURE = """
 </html>
 """
 
+
+WEVITY_DETAIL_WITH_GENERIC_LISTING_FIXTURE = """
+<html>
+<head>
+<meta property="og:title" content="2026 제천시장배 전국 e-스포츠 대회 | 공모전 대외활동 콘테스트 - 위비티">
+<title>2026 제천시장배 전국 e-스포츠 대회 | 공모전 대외활동 콘테스트 - 위비티</title>
+</head>
+<body>
+<h2>공모전 대외활동 콘테스트 메인메뉴</h2>
+<h6>2026 제천시장배 전국 e-스포츠 대회</h6>
+<ul>
+<li>분야 게임/소프트웨어</li>
+<li>응모대상 제한없음</li>
+<li>주최/주관 제천시 / 제천문화관광재단</li>
+<li>접수기간 2026-11-05 ~ 2026-12-07</li>
+</ul>
+</body>
+</html>
+"""
+
 WEVITY_DETAIL_FIXTURE = """
 <html>
 <head><title>2026 대학생 AI 아이디어 공모전 - WEVITY(위비티) 공모전</title></head>
@@ -166,6 +186,16 @@ def main():
     assert w.deadline_date == date(2026, 12, 20)
     assert w.category == "Data / AI"
     assert w.description == "See original competition page for details."
+
+    # Production regression: a generic listing title must never override the
+    # real detail-page title.
+    detail_wins = parse_detail(
+        WEVITY_DETAIL_WITH_GENERIC_LISTING_FIXTURE,
+        "https://www.wevity.com/index_university.php?c=find&gbn=viewok&ix=112329&s=_university",
+        now,
+        listing_title="공모전 대외활동 콘테스트 메인메뉴",
+    )
+    assert detail_wins.name == "2026 제천시장배 전국 e-스포츠 대회"
 
     # Production regression: shared page headings must never replace the listing title.
     generic = parse_detail(

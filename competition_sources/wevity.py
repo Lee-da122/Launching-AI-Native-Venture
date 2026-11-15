@@ -96,16 +96,61 @@ def _find_labeled_text(soup: BeautifulSoup, label: str) -> str | None:
     return None
 
 
+GENERIC_TITLE_PATTERNS = (
+    "공모전 대외활동 콘테스트 메인메뉴",
+    "공모전 대외활동 콘테스트",
+    "WEVITY",
+    "위비티",
+)
+
+
+def _is_generic_title(value: str | None) -> bool:
+    text = _clean(value)
+    if not text:
+        return True
+    compact = re.sub(r"\s+", "", text).lower()
+    generic_compact = {re.sub(r"\s+", "", item).lower() for item in GENERIC_TITLE_PATTERNS}
+    if compact in generic_compact:
+        return True
+    if "메인메뉴" in text:
+        return True
+    return False
+
+
+def _strip_site_suffix(value: str | None) -> str:
+    text = _clean(value)
+    if not text:
+        return ""
+    # Examples:
+    #   "실제 공모전명 | 공모전 대외활동 콘테스트 - 위비티"
+    #   "실제 공모전명 - WEVITY(위비티) 공모전"
+    text = re.sub(r"\s*[|｜]\s*공모전\s+대외활동.*$", "", text, flags=re.I)
+    text = re.sub(r"\s*[-–—|｜]\s*WEVITY(?:\(위비티\))?.*$", "", text, flags=re.I)
+    text = re.sub(r"\s*[-–—|｜]\s*위비티.*$", "", text, flags=re.I)
+    return _clean(text)
+
+
 def _title_from_soup(soup: BeautifulSoup) -> str:
+    # Prefer page-owned metadata before visible headings. WEVITY detail pages
+    # expose the actual contest name in the document/OG title, while shared
+    # navigation headings may contain the generic site label.
+    for attrs in ({"property": "og:title"}, {"name": "twitter:title"}):
+        meta = soup.find("meta", attrs=attrs)
+        if meta and meta.get("content"):
+            candidate = _strip_site_suffix(meta.get("content"))
+            if not _is_generic_title(candidate):
+                return candidate
+
+    if soup.title:
+        candidate = _strip_site_suffix(soup.title.get_text(" ", strip=True))
+        if not _is_generic_title(candidate):
+            return candidate
+
     for tag_name in ("h1", "h2", "h3", "h4", "h5", "h6"):
         for tag in soup.find_all(tag_name):
-            text = _clean(tag.get_text(" ", strip=True))
-            if text and "WEVITY" not in text.upper() and len(text) >= 4:
-                return text
-    if soup.title:
-        text = _clean(soup.title.get_text(" ", strip=True))
-        text = re.sub(r"\s*[-|]\s*WEVITY.*$", "", text, flags=re.I)
-        return text
+            candidate = _strip_site_suffix(tag.get_text(" ", strip=True))
+            if len(candidate) >= 4 and not _is_generic_title(candidate):
+                return candidate
     return ""
 
 
@@ -159,10 +204,11 @@ def parse_detail(
 ) -> CompetitionRecord:
     fetched_at = fetched_at or datetime.now(timezone.utc)
     soup = BeautifulSoup(detail_html, "html.parser")
-    # The WEVITY detail page contains shared navigation headings that can be
-    # mistaken for the contest title. The listing page already exposes the
-    # actual contest title, so prefer that stable value when available.
-    title = _clean(listing_title) or _title_from_soup(soup)
+    # Prefer the detail page's own metadata/title. Listing markup can contain
+    # shared navigation labels, so only use listing_title as a final fallback.
+    title = _title_from_soup(soup)
+    if not title and listing_title and not _is_generic_title(listing_title):
+        title = _clean(listing_title)
     query = parse_qs(urlparse(source_url).query)
     external_id = (query.get("ix") or [""])[0]
     if not title or not external_id:
