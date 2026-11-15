@@ -44,6 +44,16 @@ WEVITY_LIST_FIXTURE = """
 """
 
 
+
+WEVITY_BAD_ANCHOR_FIXTURE = """
+<html><body>
+<a href="index_university.php?c=find&gbn=viewok&gp=1&ix=445566&s=_university">
+  공모전 대외활동 콘테스트 메인메뉴
+  <img alt="2026 DATA·AI 분석 경진대회">
+</a>
+</body></html>
+"""
+
 WEVITY_GENERIC_HEADING_FIXTURE = """
 <html>
 <head><title>공모전 대외활동 콘테스트 메인메뉴 - WEVITY</title></head>
@@ -140,6 +150,8 @@ def main():
     # WEVITY listing/detail fixture parser.
     links = parse_listing_links(WEVITY_LIST_FIXTURE)
     assert len(links) == 2
+    bad_anchor_links = parse_listing_links(WEVITY_BAD_ANCHOR_FIXTURE)
+    assert bad_anchor_links[0][1] == "2026 DATA·AI 분석 경진대회"
     assert links[0][0].startswith("https://www.wevity.com/") and "112155" in links[0][0]
     assert is_relevant_title("2026 대학생 AI 아이디어 공모전") is True
     assert is_relevant_title("대학생 서포터즈 모집") is False

@@ -65,10 +65,13 @@ def parse_listing_links(page_html: str) -> list[tuple[str, str]]:
         href = anchor.get("href", "")
         if "ix=" not in href or "gbn=view" not in href:
             continue
-        title = _clean(anchor.get_text(" ", strip=True))
+        # WEVITY listing anchors can include shared/navigation text.
+        # The contest thumbnail alt text contains the actual listing title,
+        # so prefer it before falling back to the anchor text.
+        img = anchor.find("img")
+        title = _clean(img.get("alt")) if img else ""
         if not title:
-            img = anchor.find("img")
-            title = _clean(img.get("alt")) if img else ""
+            title = _clean(anchor.get_text(" ", strip=True))
         if not title:
             continue
         url = urljoin(BASE_URL, href)
