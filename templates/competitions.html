@@ -39,11 +39,22 @@
   {% for item in competitions %}
     {% set competition = item.competition %}
     <article class="card competition-card">
+      {% set bad_title = (not competition.name) or ('공모전 대외활동 콘테스트' in competition.name) or (competition.name in ['WEVITY', '위비티']) %}
       <div class="muted small">
-        {{ competition.organizer or "Organizer not specified" }}
-        {% if competition.category %} · {{ competition.category }}{% endif %}
+        {% if bad_title %}
+          {{ competition.category or "Competition" }}
+        {% else %}
+          {{ competition.organizer or "Organizer not specified" }}
+          {% if competition.category %} · {{ competition.category }}{% endif %}
+        {% endif %}
       </div>
-      <h2>{{ competition.name }}</h2>
+      <h2>
+        {% if bad_title %}
+          {{ (competition.organizer or "Competition") ~ " 공모전" }}
+        {% else %}
+          {{ competition.name }}
+        {% endif %}
+      </h2>
       <p>{{ competition.description or "See original competition page for details." }}</p>
       <div class="deadline">
         Deadline: {{ competition.deadline or "Not specified" }}
