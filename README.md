@@ -104,3 +104,20 @@ See `PHASE4_TEST_RESULT.md` for the latest controlled regression result.
 - Global competitions are not supported.
 - No chat, real-time messaging or notifications.
 - No post-project teamwork evaluation or permanent teammate reputation.
+
+## AI Weight Judge
+
+TeamMatch keeps teammate compatibility scoring deterministic and rule-based. AI is used only in the learning layer that reviews aggregated recommendation feedback and may propose a new set of global matching weights.
+
+Learning flow:
+
+`Recommendation Feedback → Aggregated Evidence → AI Weight Judge → Deterministic Validation → Human Approval → Active Matching Weights → Rule-based Compatibility Matching`
+
+The AI receives only aggregate counts and current global weights. It does not receive student names, email addresses, applicant identities, passwords, or person-level reputation history. A valid AI proposal remains `Pending` until an admin explicitly approves it. The validator requires all five factors, a total of 100%, 5%–50% per factor, and no single-factor change greater than 5 percentage points.
+
+Configuration:
+
+- `OPENAI_API_KEY` — secret, set only in the deployment environment.
+- `AI_WEIGHT_JUDGE_MODEL` — model configured for the AI Weight Judge.
+
+If either is missing or the provider is unavailable, normal competition discovery, Join/Recruit, matching, and recommendation feedback continue to work. AI proposal generation fails safely and never falls back to a fake deterministic AI proposal.

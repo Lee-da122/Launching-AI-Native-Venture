@@ -18,10 +18,12 @@ from learning import (
     add_demo_feedback,
     feedback_summary,
     generate_proposal,
+    recent_ai_runs,
     review_proposal,
     save_feedback,
 )
 from matching import compatibility, factor_breakdown, get_active_weights
+from ai_weight_judge import is_ai_configured
 
 APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
 IS_PRODUCTION = APP_ENV == "production" or bool(os.getenv("RAILWAY_ENVIRONMENT"))
@@ -641,6 +643,7 @@ def learning_dashboard():
     demo_team = conn.execute("SELECT * FROM teams ORDER BY id LIMIT 1").fetchone()
     conn.close()
     active = get_active_weights()
+    ai_runs = recent_ai_runs(limit=10)
 
     parsed = [
         {"row": p, "old": json.loads(p["old_weights_json"]), "new": json.loads(p["proposed_weights_json"])}
@@ -652,7 +655,8 @@ def learning_dashboard():
     ]
     return render_template(
         "learning.html", summary=summary, active_weights=active,
-        proposals=parsed, history=parsed_history, demo_team=demo_team,
+        proposals=parsed, history=parsed_history, demo_team=demo_team, ai_runs=ai_runs,
+        ai_configured=is_ai_configured(),
         demo_feedback_enabled=(not IS_PRODUCTION or os.getenv("ENABLE_DEMO_FEEDBACK", "").lower() == "true"),
     )
 
@@ -660,12 +664,8 @@ def learning_dashboard():
 @app.post("/learning/generate-proposal")
 @admin_required
 def learning_generate_proposal():
-    proposal = generate_proposal()
-    flash(
-        "Proposal ready for human review."
-        if proposal
-        else "Not enough repeated rejection evidence yet. A factor needs at least 5 learning-eligible rejections."
-    )
+    result = generate_proposal()
+    flash(result["message"])
     return redirect(url_for("learning_dashboard"))
 
 

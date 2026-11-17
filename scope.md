@@ -51,3 +51,21 @@
 - Post-project surveillance/evaluation
 
 After Phase 4 the product is feature-frozen for Demo Day; only bugs, broken deployment, misleading text and serious UX issues should be fixed.
+
+## AI Weight Judge boundary
+
+In scope:
+- aggregated recommendation feedback as learning evidence
+- AI-generated global weight-change proposals
+- deterministic validation of every AI proposal
+- mandatory admin approval/rejection
+- audit records for AI decisions and failures
+
+Out of scope:
+- AI teammate scoring
+- AI applicant decisions
+- person-level reputation
+- automatic weight activation
+- post-project success prediction
+
+AI is used in the learning layer only. Individual compatibility remains rule-based and explainable.

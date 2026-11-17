@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Learning review · TeamMatch{% endblock %}
+{% block title %}AI Weight Judge · TeamMatch{% endblock %}
 {% block content %}
 <section class="page-head">
   <div>
     <div class="eyebrow">Founder / admin review</div>
-    <h1>Recommendation learning loop</h1>
-    <p class="muted">Feedback can suggest a change. No matching weight changes until a human approves it.</p>
+    <h1>AI Weight Judge</h1>
+    <p class="muted">The AI reviews aggregated recommendation feedback and may propose a global weight adjustment. A human must approve it before it becomes active.</p>
   </div>
 </section>
 
 <div class="metric-grid">
-  <section class="metric"><span>Total feedback</span><strong>{{ summary.total }}</strong></section>
+  <section class="metric"><span>Total eligible feedback</span><strong>{{ summary.total }}</strong></section>
   <section class="metric"><span>Accepts</span><strong>{{ summary.accepts }}</strong></section>
   <section class="metric"><span>Rejects</span><strong>{{ summary.rejects }}</strong></section>
   <section class="metric"><span>Acceptance rate</span><strong>{{ summary.acceptance_rate }}%</strong></section>
@@ -18,29 +18,37 @@
 </div>
 
 <section class="card">
-  <div class="section-head"><div><h2>Active matching weights</h2><p class="muted small">Total: {{ ((active_weights.values()|sum) * 100)|round(1) }}%</p></div></div>
+  <div class="section-head"><div><h2>Current weights</h2><p class="muted small">These are the only weights currently used by the rule-based matching engine. Total: {{ ((active_weights.values()|sum) * 100)|round(1) }}%</p></div></div>
   <div class="weight-grid">
     {% for key, value in active_weights.items() %}<div><span>{{ key.replace('_',' ')|title }}</span><strong>{{ (value*100)|round(1) }}%</strong></div>{% endfor %}
   </div>
 </section>
 
 <section class="card">
-  <h2>Rejection reasons</h2>
-  <p class="muted">Only feedback from users who opted into learning is included here.</p>
+  <h2>Aggregated evidence</h2>
+  <p class="muted">Only recommendation feedback from users who opted into learning is included. Applicant accept/reject decisions are not learning signals.</p>
   {% for reason, count in summary.reason_counts.items() %}
     <div class="row-item"><span>{{ reason }}</span><strong>{{ count }}</strong></div>
   {% endfor %}
 </section>
 
 <section class="card">
-  <h2>Generate a proposed weight change</h2>
-  <p class="muted">Rule: a mapped rejection reason must appear at least 5 times. The most repeated factor is proposed at +5 percentage points; all other weights are reduced proportionally so the total stays 100%.</p>
+  <h2>Generate AI proposal</h2>
+  <p class="muted">The AI is called only after at least 5 new learning-eligible rejections map to the same factor. It receives aggregated counts only—no names, emails, applicant identities, or person-level reputation data.</p>
+  {% if ai_configured %}
+    <p class="small"><strong>AI Weight Judge:</strong> configured</p>
+  {% else %}
+    <p class="small"><strong>AI Weight Judge:</strong> unavailable until OPENAI_API_KEY and AI_WEIGHT_JUDGE_MODEL are configured. Normal matching and feedback still work.</p>
+  {% endif %}
   <div class="button-row">
     <form method="post" action="{{ url_for('learning_generate_proposal') }}">
-    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="primary compact" type="submit">Generate proposal</button></form>
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <button class="primary compact" type="submit" {% if not ai_configured %}disabled{% endif %}>Generate AI Proposal</button>
+    </form>
     {% if demo_feedback_enabled %}
     <form method="post" action="{{ url_for('learning_demo_feedback') }}">
-    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="secondary" type="submit">Add labelled demo feedback</button></form>
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="secondary" type="submit">Add labelled demo feedback</button>
+    </form>
     {% endif %}
   </div>
 </section>
@@ -49,23 +57,45 @@
   <h2>Weight proposals</h2>
   {% for p in proposals %}
     <div class="proposal">
-      <div class="row-item"><strong>{{ p.row.main_reason }}</strong><span class="status-pill">{{ p.row.status }}</span></div>
-      <p>{{ p.row.reason }}</p>
-      <div class="comparison-grid">
-        <div><h3>Current</h3>{% for key,value in p.old.items() %}<div class="mini-row"><span>{{ key }}</span><span>{{ (value*100)|round(1) }}%</span></div>{% endfor %}<div class="mini-row total"><strong>Total</strong><strong>{{ ((p.old.values()|sum)*100)|round(1) }}%</strong></div></div>
-        <div><h3>Proposed</h3>{% for key,value in p.new.items() %}<div class="mini-row"><span>{{ key }}</span><span>{{ (value*100)|round(1) }}%</span></div>{% endfor %}<div class="mini-row total"><strong>Total</strong><strong>{{ ((p.new.values()|sum)*100)|round(1) }}%</strong></div></div>
+      <div class="row-item">
+        <div><strong>{{ p.row.proposal_source or 'Rule-based' }} proposal</strong>{% if (p.row.proposal_source or 'Rule-based') == 'AI' and p.row.status == 'Pending' %}<div class="muted small">AI proposal — not yet active</div>{% endif %}</div>
+        <span class="status-pill">{{ p.row.status }}</span>
       </div>
-      <p class="muted small">Evidence: {{ p.row.feedback_count }} relevant feedback records.</p>
+      <p><strong>Why:</strong> {{ p.row.ai_reason or p.row.reason }}</p>
+      {% if p.row.evidence_summary %}<p class="muted"><strong>Evidence:</strong> {{ p.row.evidence_summary }}</p>{% endif %}
+      <div class="comparison-grid">
+        <div><h3>Current Weights</h3>{% for key,value in p.old.items() %}<div class="mini-row"><span>{{ key.replace('_',' ')|title }}</span><span>{{ (value*100)|round(1) }}%</span></div>{% endfor %}<div class="mini-row total"><strong>Total</strong><strong>{{ ((p.old.values()|sum)*100)|round(1) }}%</strong></div></div>
+        <div><h3>AI Proposed Weights</h3>{% for key,value in p.new.items() %}<div class="mini-row"><span>{{ key.replace('_',' ')|title }}</span><span>{{ (value*100)|round(1) }}%</span></div>{% endfor %}<div class="mini-row total"><strong>Total</strong><strong>{{ ((p.new.values()|sum)*100)|round(1) }}%</strong></div></div>
+      </div>
+      <p class="muted small">Eligible feedback considered: {{ p.row.eligible_feedback_count or p.row.feedback_count }}.</p>
       {% if p.row.status == 'Pending' %}
       <div class="button-row">
         <form method="post" action="{{ url_for('learning_review', proposal_id=p.row.id, action='approve') }}">
-    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="primary compact" type="submit">Approve</button></form>
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="primary compact" type="submit">Approve Proposal</button>
+        </form>
         <form method="post" action="{{ url_for('learning_review', proposal_id=p.row.id, action='reject') }}">
-    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="secondary" type="submit">Reject</button></form>
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="secondary" type="submit">Reject Proposal</button>
+        </form>
       </div>
       {% endif %}
     </div>
-  {% else %}<p class="muted">No proposals yet.</p>{% endfor %}
+  {% else %}<p class="muted">No actionable proposals yet.</p>{% endfor %}
+</section>
+
+<section class="card">
+  <h2>Recent AI Judge runs</h2>
+  <p class="muted">This is an audit trail of AI decisions, including no-change, insufficient-evidence, and failed runs. It contains aggregate evidence only.</p>
+  {% for run in ai_runs %}
+    <div class="row-item">
+      <div>
+        <strong>{{ run.decision.replace('_',' ')|title }}</strong>
+        <div class="muted small">{{ run.created_at }} · {{ run.eligible_feedback_count }} eligible feedback</div>
+        {% if run.evidence_summary %}<div class="muted small">{{ run.evidence_summary }}</div>{% endif %}
+        {% if run.error_message %}<div class="muted small">{{ run.error_message }}</div>{% endif %}
+      </div>
+      <span class="status-pill">{{ run.status }}</span>
+    </div>
+  {% else %}<p class="muted">No AI Judge runs yet.</p>{% endfor %}
 </section>
 
 <section class="card">

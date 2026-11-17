@@ -148,7 +148,32 @@ weight_proposals = Table(
     Column("status", Text, nullable=False, server_default=text("'Pending'")),
     Column("created_at", DateTime, server_default=func.current_timestamp()),
     Column("reviewed_at", DateTime),
+    Column("proposal_source", Text, nullable=False, server_default=text("'Rule-based'")),
+    Column("ai_reason", Text),
+    Column("evidence_summary", Text),
+    Column("eligible_feedback_count", Integer),
+    Column("feedback_max_id", Integer),
+    Column("ai_run_id", Integer),
     CheckConstraint("status IN ('Pending','Approved','Rejected')", name="ck_proposal_status"),
+)
+
+ai_weight_judge_runs = Table(
+    "ai_weight_judge_runs", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("decision", Text, nullable=False),
+    Column("current_weights_json", Text, nullable=False),
+    Column("proposed_weights_json", Text),
+    Column("reason", Text),
+    Column("evidence_summary", Text),
+    Column("aggregate_input_json", Text, nullable=False),
+    Column("eligible_feedback_count", Integer, nullable=False),
+    Column("excluded_feedback_count", Integer, nullable=False, server_default=text("0")),
+    Column("feedback_min_id", Integer),
+    Column("feedback_max_id", Integer),
+    Column("status", Text, nullable=False),
+    Column("error_message", Text),
+    Column("created_at", DateTime, server_default=func.current_timestamp()),
+    CheckConstraint("status IN ('Completed','Failed')", name="ck_ai_weight_judge_run_status"),
 )
 
 weight_history = Table(
@@ -294,6 +319,21 @@ def init_db():
             "CREATE INDEX IF NOT EXISTS ix_competitions_active_deadline "
             "ON competitions(is_active, deadline_date)"
         ))
+
+    # AI Weight Judge compatibility migration. Preserve historical rule-based proposals.
+    proposal_columns = {c["name"] for c in inspect(engine).get_columns("weight_proposals")}
+    proposal_additions = {
+        "proposal_source": "TEXT NOT NULL DEFAULT 'Rule-based'",
+        "ai_reason": "TEXT",
+        "evidence_summary": "TEXT",
+        "eligible_feedback_count": "INTEGER",
+        "feedback_max_id": "INTEGER",
+        "ai_run_id": "INTEGER",
+    }
+    with engine.begin() as migration_conn:
+        for column_name, column_type in proposal_additions.items():
+            if column_name not in proposal_columns:
+                migration_conn.execute(text(f"ALTER TABLE weight_proposals ADD COLUMN {column_name} {column_type}"))
 
     conn = get_db()
     existing = conn.execute("SELECT id FROM matching_settings WHERE id = :id", {"id": 1}).fetchone()

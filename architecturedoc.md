@@ -99,3 +99,26 @@ Preserved:
 ## Competition sync
 
 The web request path reads only stored competition data. Collection remains in `sync_competitions.py` and source adapters. Upsert preserves existing `competitions.id` values and therefore team/application relationships. Source failures do not clear stored competition data.
+
+## AI Weight Judge architecture
+
+The learning layer is now:
+
+`Recommendation Feedback`
+`→ Aggregated Evidence`
+`→ AI Weight Judge (structured output)`
+`→ Deterministic Validator`
+`→ Pending Proposal`
+`→ Human Approve / Reject`
+`→ matching_settings / weight_history`
+
+The matching engine remains independent of the AI provider and continues to use the active five-factor weights plus Session 8 mismatch safeguards.
+
+### Privacy
+The AI input contains current global weights, eligible feedback totals, accept/reject totals, rejection-reason counts, excluded-feedback count, and a compact proposal-history summary. No names, emails, university email, applicant identities, passwords, or person-level quality scores are sent.
+
+### Safety validation
+All five factor keys are required. Weights must be finite numeric values, sum to 1.0 within minor rounding tolerance, remain between 0.05 and 0.50, and move no more than 0.05 from the current active value. Fundamentally invalid output is rejected rather than clamped.
+
+### Failure isolation
+OpenAI/API timeout, unavailable configuration, invalid JSON/schema, invalid business-rule weights, rate limits, and provider errors do not affect normal TeamMatch matching or saved recommendation feedback. Failed AI runs cannot activate weights and remain retryable.

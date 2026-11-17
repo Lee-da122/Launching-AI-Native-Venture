@@ -9,6 +9,7 @@ from sqlalchemy.schema import CreateTable
 import db
 import learning
 import matching
+from ai_weight_judge import JudgeResult
 from guardrails import is_out_of_scope_search
 
 ROOT = Path(__file__).resolve().parent
@@ -80,7 +81,7 @@ with tempfile.TemporaryDirectory() as td:
         inspector = __import__('sqlalchemy').inspect(db.get_engine())
         expected_tables = {
             'users','competitions','teams','applications','shortlists','matching_settings',
-            'recommendation_feedback','weight_proposals','weight_history'
+            'recommendation_feedback','weight_proposals','weight_history','ai_weight_judge_runs'
         }
         check('Schema bootstrap idempotent', expected_tables.issubset(set(inspector.get_table_names())), str(inspector.get_table_names()))
 
@@ -105,9 +106,16 @@ with tempfile.TemporaryDirectory() as td:
         summary = learning.feedback_summary()
         check('Opt-out excluded from learning summary', summary['total'] == 5 and summary['reason_counts']['Skill fit'] == 0, str(summary['reason_counts']))
 
-        proposal = learning.generate_proposal()
+        fake_judge = lambda payload: JudgeResult(
+            'propose_change',
+            {'skills':0.33,'availability':0.25,'preferred_role':0.19,'working_style':0.09,'project_goal':0.14},
+            'Availability is the dominant repeated rejection reason.',
+            '5 of 5 eligible rejections were related to availability.',
+        )
+        result = learning.generate_proposal(judge_fn=fake_judge)
+        proposal = result['proposal']
         before = matching.get_active_weights()
-        check('Proposal created at threshold', proposal and proposal['factor'] == 'availability', str(proposal))
+        check('AI proposal created at threshold', result['status'] == 'proposal_created' and proposal['factor'] == 'availability', str(result['status']))
         check('Proposal does not auto-apply', before == weights0, f'before={before}')
         proposed = json.loads(proposal['proposed_weights_json'])
         check('Proposed weights normalized', abs(sum(proposed.values()) - 1.0) < 1e-9, str(proposed))
@@ -121,10 +129,19 @@ with tempfile.TemporaryDirectory() as td:
         conn.close()
         check('Weight history saved', history_count == 1, f'count={history_count}')
 
-        # Generate another eligible proposal and reject it; active weights must remain unchanged.
-        proposal2 = learning.generate_proposal()
+        # Add new evidence, generate a second AI proposal, and reject it.
+        for _ in range(5):
+            learning.save_feedback(joiner, tid, 'Reject', 'Skill fit', '', score, factors, after, True)
+        fake_judge2 = lambda payload: JudgeResult(
+            'propose_change',
+            {'skills':0.35,'availability':0.23,'preferred_role':0.19,'working_style':0.09,'project_goal':0.14},
+            'Skill-fit rejections dominate the new evidence.',
+            '5 new eligible rejections were related to skill fit.',
+        )
+        result2 = learning.generate_proposal(judge_fn=fake_judge2)
+        proposal2 = result2['proposal']
         active_pre_reject = matching.get_active_weights()
-        check('Second proposal can be reviewed', bool(proposal2), str(proposal2))
+        check('Second AI proposal can be reviewed', result2['status'] == 'proposal_created' and bool(proposal2), str(result2['status']))
         learning.review_proposal(proposal2['id'], 'Rejected')
         check('Rejected proposal leaves weights unchanged', matching.get_active_weights() == active_pre_reject, str(active_pre_reject))
 
@@ -140,7 +157,7 @@ with tempfile.TemporaryDirectory() as td:
             'history': conn.execute('SELECT COUNT(*) AS c FROM weight_history').fetchone()['c'],
         }
         conn.close()
-        check('Restart preserves SQLite fallback data', persisted == {'users':2,'teams':1,'applications':1,'feedback':6,'history':1}, str(persisted))
+        check('Restart preserves SQLite fallback data', persisted == {'users':2,'teams':1,'applications':1,'feedback':11,'history':1}, str(persisted))
         check('Restart preserves active weights', matching.get_active_weights() == after, str(matching.get_active_weights()))
     finally:
         db.DB_PATH = old_path
