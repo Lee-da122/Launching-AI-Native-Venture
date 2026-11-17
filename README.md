@@ -121,3 +121,26 @@ Configuration:
 - `AI_WEIGHT_JUDGE_MODEL` — model configured for the AI Weight Judge.
 
 If either is missing or the provider is unavailable, normal competition discovery, Join/Recruit, matching, and recommendation feedback continue to work. AI proposal generation fails safely and never falls back to a fake deterministic AI proposal.
+
+## Demo Day evaluation evidence
+
+The admin Learning page includes a reproducible Evaluation Evidence section. It reruns fixed synthetic fixtures without modifying production data.
+
+- Normal matching regression: 10/10 PASS
+- Critical mismatch attack regression: 5/5 PASS
+- Phase 4 regression: 22/22 PASS
+- AI Weight Judge contract tests: 19/19 PASS
+- Same-case improvement checks: 5/5 PASS
+- Development AI Eval Judge: 4/4 correct outputs agreed; 4/4 intentionally broken outputs caught
+
+Same-case before/after safeguard evidence:
+
+| Case | Before | After |
+| --- | ---: | ---: |
+| No required skill overlap | 65% | 40% |
+| Non-flexible role mismatch | 80% | 60% |
+| Opposite project-effort goal | 85% | 65% |
+| All three critical mismatches | 30% | 0% |
+| Strong-match control | 100% | 100% |
+
+The development AI Eval Judge is separate from the production AI Weight Judge. It is presentation/evaluation evidence only and does not change matching weights.
