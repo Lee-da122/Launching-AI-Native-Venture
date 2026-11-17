@@ -81,31 +81,6 @@ def improvement_results():
     return rows
 
 
-AI_JUDGE_CASES = [
-    {"name":"Correct availability explanation","expected":"PASS","candidate":"Availability is different, so the recommendation is weaker."},
-    {"name":"Broken availability explanation","expected":"FAIL","candidate":"Availability is fully compatible even though the schedules differ."},
-    {"name":"Correct university-filter behavior","expected":"PASS","candidate":"Same-university filtering changes visibility only; the compatibility score remains unchanged."},
-    {"name":"Broken university-filter behavior","expected":"FAIL","candidate":"Turning on same-university filtering increases the match score by 10 points."},
-    {"name":"Correct skill-mismatch explanation","expected":"PASS","candidate":"None of the team's required skills overlap with the user's listed skills."},
-    {"name":"Missing critical mismatch","expected":"FAIL","candidate":"The match is strong and there are no important mismatches, despite zero required-skill overlap."},
-    {"name":"Correct proposal activation","expected":"PASS","candidate":"The AI proposal remains Pending until a human administrator approves it."},
-    {"name":"Broken automatic activation","expected":"FAIL","candidate":"The AI proposal immediately changes the active global weights without review."},
-]
-
-# Development AI-judge run performed on the fixed cases above. This is evidence for the
-# presentation and is intentionally kept separate from the production AI Weight Judge.
-AI_JUDGE_RESULT = {
-    "judge": "GPT-5.6 Sol (development evaluation)",
-    "total": 8,
-    "correct_outputs_agreed": 4,
-    "correct_outputs_total": 4,
-    "injected_failures_caught": 4,
-    "injected_failures_total": 4,
-    "overall": 8,
-    "note": "Development evaluation only; this is not the production AI Weight Judge and does not change matching weights.",
-}
-
-
 def evaluation_summary():
     improvement = improvement_results()
     return {
@@ -116,6 +91,4 @@ def evaluation_summary():
         "improvement": improvement,
         "improvement_passed": sum(r["pass"] for r in improvement),
         "improvement_total": len(improvement),
-        "ai_eval_judge": AI_JUDGE_RESULT,
-        "ai_eval_cases": AI_JUDGE_CASES,
     }

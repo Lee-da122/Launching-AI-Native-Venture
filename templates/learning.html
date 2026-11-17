@@ -98,24 +98,6 @@
   {% else %}<p class="muted">No AI Judge runs yet.</p>{% endfor %}
 </section>
 
-
-    <section class="metric"><span>Critical mismatch attacks</span><strong>{{ eval_summary.attack_regression.passed }}/{{ eval_summary.attack_regression.total }}</strong></section>
-    <section class="metric"><span>Phase 4 regression</span><strong>{{ eval_summary.phase4_regression.passed }}/{{ eval_summary.phase4_regression.total }}</strong></section>
-    <section class="metric"><span>AI Weight Judge contract</span><strong>{{ eval_summary.ai_weight_judge_contract.passed }}/{{ eval_summary.ai_weight_judge_contract.total }}</strong></section>
-  </div>
-  <h3>Before → After on the same cases</h3>
-  <div class="table-wrap"><table class="data-table"><thead><tr><th>Case</th><th>Before</th><th>After</th><th>Expected behavior</th></tr></thead><tbody>
-  {% for r in eval_summary.improvement %}<tr><td>{{ r.name }}</td><td>{{ r.before }}%</td><td>{{ r.after }}%</td><td>{{ r.expected }}</td></tr>{% endfor %}
-  </tbody></table></div>
-  <h3>AI Eval Judge</h3>
-  <p class="muted small">Separate development evaluator; not the production AI Weight Judge.</p>
-  <div class="comparison-grid">
-    <div><strong>Correct outputs agreed</strong><div class="big-number">{{ eval_summary.ai_eval_judge.correct_outputs_agreed }}/{{ eval_summary.ai_eval_judge.correct_outputs_total }}</div></div>
-    <div><strong>Injected failures caught</strong><div class="big-number">{{ eval_summary.ai_eval_judge.injected_failures_caught }}/{{ eval_summary.ai_eval_judge.injected_failures_total }}</div></div>
-  </div>
-  <p class="muted small">Judge: {{ eval_summary.ai_eval_judge.judge }}. {{ eval_summary.ai_eval_judge.note }}</p>
-</section>
-
 <section class="card">
   <h2>Approved weight history</h2>
   {% for h in history %}

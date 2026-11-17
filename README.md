@@ -124,23 +124,14 @@ If either is missing or the provider is unavailable, normal competition discover
 
 ## Demo Day evaluation evidence
 
-The admin Learning page includes a reproducible Evaluation Evidence section. It reruns fixed synthetic fixtures without modifying production data.
+Evaluation evidence is kept in code/tests and `EVALUATION_EVIDENCE.md`; it is intentionally not shown in the user-facing product UI.
 
-- Normal matching regression: 10/10 PASS
-- Critical mismatch attack regression: 5/5 PASS
-- Phase 4 regression: 22/22 PASS
-- AI Weight Judge contract tests: 19/19 PASS
-- Same-case improvement checks: 5/5 PASS
-- Development AI Eval Judge: 4/4 correct outputs agreed; 4/4 intentionally broken outputs caught
+Current reproducible evidence includes:
 
-Same-case before/after safeguard evidence:
+- Session 8 normal regression: 10/10 predefined cases passed
+- Session 8 attack regression: 5/5 predefined cases passed
+- Phase 4 focused regression: 22/22 checks passed
+- AI Weight Judge contract tests: 19/19 checks passed
+- Same-case safeguard comparison: 5/5 checks behaved as expected
 
-| Case | Before | After |
-| --- | ---: | ---: |
-| No required skill overlap | 65% | 40% |
-| Non-flexible role mismatch | 80% | 60% |
-| Opposite project-effort goal | 85% | 65% |
-| All three critical mismatches | 30% | 0% |
-| Strong-match control | 100% | 100% |
-
-The development AI Eval Judge is separate from the production AI Weight Judge. It is presentation/evaluation evidence only and does not change matching weights.
+These are regression/contract results, not a claim of 100% real-world matching accuracy. The earlier 7/10 normal and 4/5 attack figures were supplied as the Session 8 baseline rather than rerun from the old code. The production AI Weight Judge API attempt returned `RateLimitError`, so no successful live AI proposal is claimed.
